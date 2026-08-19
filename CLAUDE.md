@@ -5,8 +5,9 @@ LEV is an **offline-first, privacy-preserving, cross-platform** application (bui
 ## Specifications — read before developing
 The full requirements live in these documents. Read them before implementing anything.
 
-@docs/technical-spec.md
 @docs/product-spec.md
+@docs/technical-spec.md
+@docs/technical-decisions.md
 
 
 ## Non-negotiable rules
