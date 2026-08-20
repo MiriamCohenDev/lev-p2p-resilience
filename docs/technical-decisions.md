@@ -149,6 +149,54 @@
 
 ---
 
+## #9 — Routing: `go_router`
+
+**Status:** Accepted
+
+**Decision.** Use **`go_router`** for navigation, with the router exposed as a Riverpod `Provider<GoRouter>` (`lib/core/routing/app_router.dart`) rather than as a global. Route paths and names live in a single `AppRoutes` constants class; screens never hardcode route strings. Chat and Tasks are declared as **nested routes under Home**, so each carries a real back stack.
+
+**Rationale.** Phase 0 has to establish routing (technical-spec Section 9) and the spec names no library. `go_router` is the Flutter Team's own package, gives declarative routes that a widget test can drive without a `NavigatorObserver`, and handles the desktop targets (window/deep-link entry points) that are first-class here. Putting the router behind a provider matters specifically for the PIN-lock redirect that #5 anticipates: a lock gate becomes a `redirect` on an overridable provider, not a rewrite of the app root.
+
+**Rejected alternatives.**
+
+- *Plain Navigator 1.0/2.0* — zero extra dependency, which is the argument for it. Rejected because three screens is where the app *starts*, not where it ends: nested flows and the future lock gate would mean hand-rolling exactly what `go_router` provides, and imperative navigation is harder to assert on in tests.
+
+**Consequence.** One dependency outside the stack listed in the technical spec. Navigation is now declarative — adding a screen means adding a `GoRoute` plus an `AppRoutes` constant, not touching the app root.
+
+---
+
+## #10 — Riverpod providers written by hand, not generated
+
+**Status:** Accepted
+
+**Decision.** Declare Riverpod providers manually (`Provider`, `NotifierProvider`, …). Do **not** add `riverpod_generator` / `riverpod_annotation`.
+
+**Rationale.** Codegen buys terseness and some compile-time safety, at the cost of a `build_runner` pass standing between every provider edit and a runnable app. Phase 1 already forces `build_runner` into the project for Drift's table code — where generation is genuinely load-bearing, because the alternative is hand-writing SQL mappers. Provider declarations have no such payoff: they are a handful of lines each, and this project has one developer for whom a slow inner loop is the real cost.
+
+**Rejected alternatives.**
+
+- *`@riverpod` code generation* — less boilerplate and automatic `keepAlive`/family typing. Rejected on inner-loop cost at this project's size, not on correctness.
+
+**Consequence.** Provider declarations are slightly more verbose and `ref.watch` types are written explicitly. Reversible: adopting codegen later is a mechanical, provider-by-provider migration, not an architectural change.
+
+---
+
+## #11 — UI localization (English + Hebrew, RTL) wired from Phase 0
+
+**Status:** Accepted
+
+**Decision.** Set up `flutter_localizations` + ARB files (`lib/core/l10n/app_en.arb`, `app_he.arb`, `l10n.yaml`) in Phase 0. Every user-visible string is keyed from the first screen onward; no literal strings in widgets. Locale follows the device.
+
+**Rationale.** Technical-spec Section 8 requires the **UI** to support English and Hebrew including RTL. Retrofitting i18n is one of the few tasks that gets strictly more expensive with every screen added — it means revisiting every widget already written — and RTL breaks layout in ways that only appear when actually rendered RTL. Doing it at Phase 0 costs almost nothing (three screens) and turns "does it work in Hebrew?" into a test that runs from day one rather than a discovery made in Phase 5.
+
+**Rejected alternatives.**
+
+- *Defer i18n to a later phase* — faster Phase 0. Rejected: it front-loads no risk and back-loads a sweep across every screen plus an unknown pile of RTL layout defects.
+
+**Consequence — do not confuse this with #3.** This decision covers the **interface only**. The **model** remains English-only in v1; the Hebrew-model gap in #3 is untouched and still Open. A Hebrew-reading user gets a Hebrew UI and an English assistant.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).
