@@ -9,10 +9,14 @@ abstract interface in `domain` and gets the implementation from a provider regis
 Providers that belong to exactly one feature stay inside that feature; only cross-cutting
 bindings belong in this folder.
 
-Empty in Phase 0 — there are no interfaces to bind yet. Expected occupants:
+Current and expected occupants:
 
-| Phase | Binding |
-|---|---|
-| 1 | `AppDatabase`, `KeyManager`, repository implementations |
-| 2 | `LlmService` → llama.cpp binding, `ModelSelector` |
-| 4 | `TransportService` → no-op stub |
+| Phase | Binding | File |
+|---|---|---|
+| 1 | `SecureKeyStore`, `KekSource`, `KeyManager` | `crypto_providers.dart` ✅ |
+| 1 | `AppDatabase`, repository implementations | — |
+| 2 | `LlmService` → llama.cpp binding, `ModelSelector` | — |
+| 4 | `TransportService` → no-op stub | — |
+
+Overriding `secureKeyStoreProvider` with an in-memory fake makes the whole
+key-management chain testable without a device; see `test/core/crypto/`.

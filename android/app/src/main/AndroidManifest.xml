@@ -1,8 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Backup is off for two reasons, both non-negotiable. Android auto-backup
+         would copy app data to Google Drive, which the product's no-cloud rule
+         forbids outright. It also restores secure-storage entries onto a device
+         whose Keystore cannot unwrap them, producing the
+         "InvalidKeyException: Failed to unwrap key" that would surface here as
+         an unopenable database. See lib/core/crypto/. -->
     <application
         android:label="lev"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

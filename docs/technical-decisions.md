@@ -197,6 +197,68 @@
 
 ---
 
+## #12 — Key-management storage layout: one record is the commit point
+
+**Status:** Accepted
+
+**Decision.** The DEK/KEK scheme of #5 is implemented with exactly two entries in
+`flutter_secure_storage`:
+
+- `lev.kek.v1` — the raw KEK, present only while the KEK is the stored kind.
+- `lev.keystate.v1` — a JSON record holding the **wrapped DEK** together with the
+  wrapping mode, and `kdf`/`salt` fields reserved for PIN mode.
+
+Wrapping is AES-256-GCM from **`cryptography_plus`**, in an envelope of
+`version(1) ‖ nonce(12) ‖ ciphertext ‖ mac(16)`. The KEK is reached through an
+abstract `KekSource`; only the secure-storage implementation exists.
+
+Any read failure raises a typed exception. New key material is provisioned
+**only** when the store cleanly reports that nothing is there.
+
+**Rationale.** Putting the wrapped DEK inside the same record as the wrapping
+mode is what makes #5's promise — that toggling a PIN only re-wraps — survive a
+crash. A future switch is: derive the new KEK, wrap the same DEK, **write the
+record once**, then drop the KEK the old mode used. That single write is the
+commit point. Interrupted before it, the old record and old KEK are both intact;
+interrupted after it, the new record is authoritative and the stale KEK is
+removed by `sweepIncompleteRewrap()` on the next launch. There is no ordering in
+which no valid wrapping exists.
+
+The fail-closed rule is the other half. `flutter_secure_storage` throws rather
+than returning null when the OS store is unreachable — a missing libsecret or a
+locked keyring on Linux, a Keystore error on Android. Reading such a failure as
+"first run" would provision a fresh DEK on top of an existing encrypted
+database and destroy it silently. With no server and no backup, that is
+unrecoverable, so "absent" and "failed" are kept structurally distinct all the
+way down.
+
+Android auto-backup is disabled in the manifest for the same reason: it
+contradicts the no-cloud rule, and restoring secure-storage entries onto a
+different device yields a KEK the Keystore cannot unwrap.
+
+**Rejected alternatives.**
+
+- *A separate `lev.dek.v1` entry plus a metadata pointer* — the layout this
+  started as. Rejected: committing a mode switch then meant writing two entries,
+  and a crash between them left a state where neither entry could be identified
+  as the live one without embedding the mode in the envelope anyway.
+- *A `pending` scratch slot for the in-progress re-wrap* — unnecessary once the
+  record itself is atomic, and actively harmful: after a commit the pending blob
+  is the *winner*, so a naive startup sweep that deletes it destroys data.
+- *`pointycastle`* — battle-tested and equally capable (`GCMBlockCipher` +
+  `Argon2BytesGenerator`), but a markedly lower-level API for the same result.
+  Kept as the fallback if `cryptography_plus` stops being maintained.
+- *Storing the SQLCipher key directly, without wrapping* — already rejected in
+  #5; restated here because in default mode the two look deceptively similar.
+
+**Consequence.** PIN mode becomes a new `KekSource` plus a re-wrap routine that
+writes one record — no schema change, no migration, no re-encryption. Callers of
+`KeyManager` must handle `KeyManagementException`; in particular
+`KeyMaterialMissing` is a real state that Phase 1's database step has to decide
+about, since only that layer can tell whether a database file exists.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

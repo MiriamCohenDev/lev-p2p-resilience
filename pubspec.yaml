@@ -24,6 +24,8 @@ dependencies:
   uuid: ^4.6.0
   # Localization support: English + Hebrew UI, incl. RTL (technical-decisions #11).
   intl: ^0.20.3
+  cryptography_plus: ^3.0.0
+  flutter_secure_storage: ^11.0.0
 
 dev_dependencies:
   flutter_test:
