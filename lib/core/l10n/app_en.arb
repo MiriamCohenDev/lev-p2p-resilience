@@ -1,0 +1,53 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "LEV",
+  "@appTitle": {
+    "description": "The application name, shown in the task switcher and app bars"
+  },
+
+  "homeTagline": "A quiet space for support and mutual aid.",
+  "@homeTagline": {
+    "description": "One-line summary of LEV's purpose, shown on the Home screen"
+  },
+
+  "homeDescription": "LEV runs entirely on your device. Talk things through with a local assistant, or lend and receive a hand nearby. No account, no server, nothing leaves this device.",
+  "@homeDescription": {
+    "description": "Short paragraph on the Home screen describing what LEV is"
+  },
+
+  "homeOpenChat": "Start a conversation",
+  "@homeOpenChat": {
+    "description": "Home screen button that navigates to the Chat screen"
+  },
+
+  "homeOpenTasks": "Help requests",
+  "@homeOpenTasks": {
+    "description": "Home screen button that navigates to the Tasks screen"
+  },
+
+  "chatTitle": "Conversation",
+  "@chatTitle": {
+    "description": "App bar title of the Chat screen"
+  },
+
+  "chatComingSoon": "The supportive chat is not built yet.",
+  "@chatComingSoon": {
+    "description": "Placeholder shown on the Chat screen until the feature is implemented"
+  },
+
+  "tasksTitle": "Help requests",
+  "@tasksTitle": {
+    "description": "App bar title of the Tasks screen"
+  },
+
+  "tasksComingSoon": "Mutual aid is not built yet.",
+  "@tasksComingSoon": {
+    "description": "Placeholder shown on the Tasks screen until the feature is implemented"
+  },
+
+  "back": "Back",
+  "@back": {
+    "description": "Generic action returning to the previous screen"
+  }
+}
