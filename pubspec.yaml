@@ -27,13 +27,38 @@ dependencies:
   cryptography_plus: ^3.0.0
   flutter_secure_storage: ^11.0.0
 
+  # Encrypted local database (technical-spec Section 5.5, technical-decisions #4).
+  drift: ^2.34.3
+  # Direct: the storage layer runs SQLCipher pragmas against it (see `hooks`).
+  sqlite3: ^3.5.2
+  # Locating the database file per platform.
+  path_provider: ^2.1.6
+  path: ^1.9.1
+
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # On-device tests: the real secure store and the real database file, which a
+  # host test cannot reach (see integration_test/).
+  integration_test:
     sdk: flutter
 
   flutter_lints: ^6.0.0
   # Mocking domain interfaces in unit tests (technical-spec Section 4).
   mocktail: ^1.0.4
+  # Drift table code generation.
+  drift_dev: ^2.34.5
+  build_runner: ^2.16.0
+
+# Builds SQLite as SQLCipher instead of plain SQLite (technical-decisions #13).
+# `sqlcipher_flutter_libs` — named in technical-spec Section 4 — is EOL; from
+# package:sqlite3 3.x the native library is selected here. Without this block
+# the app links plain SQLite, where `PRAGMA key` is silently ignored — see the
+# cipher_version guard in lib/core/db/encrypted_database_opener.dart.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher
 
 flutter:
   uses-material-design: true

@@ -259,6 +259,200 @@ about, since only that layer can tell whether a database file exists.
 
 ---
 
+## #13 — SQLCipher comes from `package:sqlite3` build hooks, and the build is verified at runtime
+
+**Status:** Accepted
+
+**Decision.** Three parts, and the third is the one that matters most.
+
+1. **Source.** SQLCipher is selected in `pubspec.yaml` rather than by a plugin
+   dependency:
+
+   ```yaml
+   hooks:
+     user_defines:
+       sqlite3:
+         source: sqlcipher
+   ```
+
+   `sqlcipher_flutter_libs` — named in technical-spec Section 4 and Appendix A —
+   is **not** used. Nothing calls `open.overrideFor`, and there is no
+   per-platform configuration.
+
+2. **Fail closed.** `openEncryptedDatabase` obtains the DEK *before* touching the
+   filesystem, so a key failure leaves the disk untouched by construction. Each
+   `KeyManagementException` is translated into a `DatabaseOpenException` that
+   states whether a database file was at stake. No database file is ever opened,
+   created, or deleted without a valid DEK, and there is never a fallback to an
+   unencrypted database.
+
+3. **`PRAGMA cipher_version` is asserted on every open.** If it returns nothing,
+   the open fails with `DatabaseNotEncrypted`.
+
+**Rationale.**
+
+*On (1)* — the named package is end-of-life, not merely dated. Its last release
+is `0.7.0+eol` (2026-02-15) whose own description reads *"Not used anymore,
+update to version 3.x of package:sqlite3 instead"*; `UPGRADING_TO_V3.md` in
+`simolus3/sqlite3.dart` says *"If you depend on `sqlcipher_flutter_libs`, stop
+doing that… `sqlcipher_flutter_libs` is no longer functional"*; and its directory
+has been removed from the repository's main branch. This is not third-party
+abandonment — simolus3 maintains drift, `package:sqlite3` and the retired package
+alike. From `package:sqlite3` 3.x the native library is built through Dart build
+hooks instead of a Flutter plugin, and `drift 2.34.3` depends on `sqlite3:
+^3.4.0`, so any current drift is already in that world. Staying on the spec's
+literal wording would mean pinning drift to a pre-3.x release permanently.
+
+*On (3)* — this is the guard the entire encryption-at-rest claim rests on. Plain
+SQLite does not reject `PRAGMA key`; it **ignores it silently** and creates an
+ordinary plaintext database. A build whose hook configuration failed to apply
+would therefore look completely healthy — the app opens, writes and reads
+normally — while putting every conversation and help request on disk in the
+clear, which CLAUDE.md rules out absolutely. `PRAGMA cipher_version` returns no
+rows on plain SQLite and the cipher's version on SQLCipher, so one statement at
+open time turns a silent catastrophe into a loud startup failure. This was
+verified by deliberately building with `source: sqlite3`: the open aborts with
+`DatabaseNotEncrypted` and leaves a zero-byte file — no user data reaches disk.
+
+*On (2)* — this answers the question #12 explicitly deferred to this layer. Only
+storage can see whether a database file exists, and that is exactly what decides
+severity: `KeyMaterialMissing(wrappedDek)` with no file on disk is a resettable
+installation, while the same key state *with* a file is unrecoverable data loss.
+`DatabaseKeyLost` carries `databaseFileExists` so a caller can tell the two
+apart. Resetting is destructive and needs the user's consent, so it is **not**
+performed here — the failure is reported and the disk is left alone.
+
+**Rejected alternatives.**
+
+- *Pin `sqlcipher_flutter_libs` 0.6.8 (its last functional release) plus a
+  pre-3.x drift* — keeps the spec's literal wording and works today. Rejected:
+  it freezes the storage layer on code the maintainer has already retired, and
+  reintroduces the manual `open.overrideFor` wiring per platform that the hook
+  removes.
+- *Trusting the build configuration without the `cipher_version` assertion* —
+  one less statement per open. Rejected outright: the failure mode is silent
+  plaintext, which is unacceptable at any price in statements.
+- *Automatically resetting the installation when the key record is gone and no
+  database file exists* — technically safe in that exact state. Rejected because
+  the storage layer cannot ask the user, and a rule of "sometimes we delete key
+  material on startup" is one misjudged condition away from destroying data with
+  no server and no backup to recover from.
+
+**Consequence — three things this commits us to.**
+
+- The build hook **downloads the SQLCipher binary from the network at build
+  time**. This does not violate LEV's offline rule, which governs *runtime*
+  (`flutter pub get` already needs a network), but a fully reproducible offline
+  build needs the `url_pattern` user-define pointed at an internal mirror. Open
+  for Phase 5.
+- The SQLCipher build **links OpenSSL on Windows, Linux and Android**, and per
+  its documentation "may include an older SQLite version than the default build".
+  Both matter for packaging and licensing in Phase 5.
+- `PRAGMA key` takes the raw key as a **quoted string** — `PRAGMA key = "x'…'";`.
+  Passing the blob literal unquoted is a syntax error. Related: the hex form of
+  the DEK is a Dart `String` and therefore cannot be wiped from memory; the byte
+  array is wiped, the string is not. That is inherent to the `PRAGMA key` API.
+
+**Verified on device.** `integration_test/encrypted_storage_test.dart` runs the
+unsubstituted chain — OS secure store → KEK → wrapped DEK → SQLCipher — on both
+Android and Windows, and confirms that a second launch unwraps the *same* DEK
+rather than quietly provisioning a new one. Three findings worth keeping:
+
+- The hook produces `libsqlcipher.so` for **all three Android ABIs**
+  (`arm64-v8a` 4.85 MB, `armeabi-v7a` 3.91 MB, `x86_64` 5.67 MB). No `minSdk`
+  raise was needed — `flutter.minSdkVersion` suffices. The per-ABI cost is small
+  next to the bundled model but belongs in the Phase 5 size budget.
+- Runtime is proven on `x86_64` (emulator) and Windows. The arm64 binary is
+  *built* but has not been *run*; a physical-device check is still outstanding.
+- Checking an encrypted file by trying to open it with plain SQLite is
+  **vacuous on a zero-byte file** — Python's `sqlite3` treats an empty file as a
+  new database and reports success. Any such check must assert the file is
+  non-empty first.
+
+---
+
+## #14 — Chat schema: §6.1 literally, timestamps as text, and the probe retired
+
+**Status:** Accepted
+
+**Decision.** `lev.db` at `schemaVersion 1` holds two tables, `conversations` and
+`messages`, with exactly the columns technical-spec §6.1 lists — **no
+`originDeviceId`, no `isDeleted`**. Timestamps are stored as ISO-8601 **text**,
+not as unix seconds. `PRAGMA foreign_keys = ON` is set on every connection.
+`ChatRepository` sits in `features/chat/domain`; the Drift implementation and the
+row→entity mapping sit in `features/chat/data`. The `lev_probe.db` scaffolding
+from #13 is deleted.
+
+**Rationale.**
+
+*On the missing sync columns.* CLAUDE.md states the rule categorically — "Every
+shareable entity uses a UUID primary key, carries `createdAt`/`updatedAt` +
+`originDeviceId`, and uses tombstones". Its precondition is **shareable**, and
+chat is not: §3.1 makes zero dependency on networking the single most important
+architectural constraint, and §2.2 puts cross-device sync out of scope entirely.
+§6.1 reflects exactly that — it lists those columns for `HelpRequest` and
+`HelpCommitment` and omits them for `Conversation` and `Message`. The decisive
+practical point: `DeviceIdentity` is itself marked Phase 2 in §6.1 and does not
+exist, so an `originDeviceId` column could only be filled with a placeholder.
+A column that can hold nothing true is worse than no column.
+
+*On text timestamps.* Drift's default stores a `DateTime` as unix **seconds**,
+truncating everything finer. In a streaming chat a user's message and the
+assistant's reply routinely land inside the same second, and `ORDER BY createdAt`
+would then return them in an order SQLite is free to vary between reads — a
+conversation that reshuffles itself. This was not theoretical: three repository
+tests failed on it before the option was set. Text keeps sub-second precision and
+still sorts correctly as a string. Decided at `schemaVersion 1` because changing
+it later means rewriting every stored timestamp.
+
+*On foreign keys.* SQLite ignores foreign keys unless enabled, per connection.
+Without the pragma the `references` declaration is a comment, and an orphaned
+message — one whose conversation was deleted — would be accepted silently. It is
+set in `encrypted_database_opener.dart` beside `PRAGMA key`, and both the host
+tests and the repository tests assert that an orphan insert is rejected.
+
+**Rejected alternatives.**
+
+- *Apply CLAUDE.md's rule uniformly, including to chat* — consistent, and cheap
+  insurance if chat is ever synced. Rejected: it writes a placeholder device id
+  for a device identity that will not exist until Phase 2, and contradicts the
+  explicit table in §6.1. If chat ever becomes shareable, adding the columns is a
+  migration — the same migration this would be paying for now, only without
+  knowing what to put in them.
+- *Both help tables in schema 1 as well* — one schema, no migration to write in
+  Phase 4. Rejected in favour of shipping what Phase 3 needs; the mutual-aid
+  tables arrive as schema **2**, and `drift_schemas/drift_schema_v1.json` is
+  committed so that migration can be tested rather than hoped about.
+- *Keeping `lev_probe.db` as a standing smoke test* — the original intent in #13.
+  Rejected once the on-device tests existed: proving encryption against the real
+  database is strictly stronger than proving it against a scratch table, and a
+  second SQLCipher file opened on every launch is cost without benefit. The
+  encryption checks now write a real `Message` through the real repository, so
+  what the byte-level audit examines is user data in its actual shape.
+- *`ChatRepository` exactly as §5.1 sketches it* — two methods. Rejected: that
+  sketch is marked illustrative and cannot stand alone, because a message cannot
+  be appended to a conversation that does not exist and the foreign key now
+  enforces it. `createConversation` and `watchConversations` were added;
+  `watchConversation` was renamed `watchMessages`, since it returns messages.
+  Nothing else was added — product-spec §5 lists no conversation-management
+  action, so there is no delete or rename.
+
+**Consequence.**
+
+- The Dart getter for the message body is `body`, not `text`: `text` is drift's
+  own column-builder method on `Table` and cannot be shadowed. `named('text')`
+  keeps §6.1's column name on disk, and the domain entity restores `Message.text`
+  — the name collision is confined to the row class.
+- Drift row classes are `ConversationRow` / `MessageRow` (via `@DataClassName`)
+  so the domain entities can own `Conversation` and `Message` without prefixed
+  imports anywhere.
+- Verified end to end: a conversation and message written through
+  `ChatRepository` survive a close and reopen on Android and Windows, and the
+  file pulled off the device shows random salt, no canary, **and no table names**
+  — the schema itself is inside the encryption — with plain SQLite refusing it.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).
