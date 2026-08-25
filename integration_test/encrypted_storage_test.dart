@@ -22,6 +22,7 @@ import 'package:lev/core/di/chat_providers.dart';
 import 'package:lev/core/di/crypto_providers.dart';
 import 'package:lev/core/di/db_providers.dart';
 import 'package:lev/features/chat/domain/message.dart';
+import 'package:lev/features/chat/domain/message_role.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -95,7 +96,7 @@ void main() {
     expect(conversations.single.title, 'on device');
     expect(messages, hasLength(1));
     expect(messages.single.text, contains(storageProbeCanary));
-    expect(messages.single.fromUser, isTrue);
+    expect(messages.single.role, MessageRole.user);
     expect(messages.single.createdAt.isAtSameMomentAs(sentAt), isTrue);
 
     // The path is printed, never the key — it is what the manual adb / byte

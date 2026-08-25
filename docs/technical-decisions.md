@@ -453,6 +453,67 @@ tests and the repository tests assert that an orphan insert is rejected.
 
 ---
 
+## #15 — Chat schema realigned to technical-spec v0.2, in place at `schemaVersion 1`
+
+**Status:** Accepted — supersedes the schema half of #14
+
+**Decision.** The chat schema now matches technical-spec v0.2 §6.1 field for field,
+changed **in place at `schemaVersion 1`** rather than migrated to schema 2:
+
+- `Messages.fromUser` (boolean) → `Messages.role` (text: `user` | `assistant` |
+  `system`). The vocabulary is owned by `MessageRole.wireName` in the domain, and
+  the column stays a plain text column rather than a drift enum converter so that
+  an unrecognised value fails loudly in one place with a `FormatException`.
+- `Conversations` gains `summary`, `summaryUpToMessageId`, `systemPromptVersion`,
+  `modelId` and `isDeleted`.
+- `ChatRepository` gains `deleteConversation`, `saveSummary`, `findConversation`
+  and `messagesOf`.
+- An index on `messages (conversation_id, created_at)` — the one query the chat
+  runs constantly.
+- `build.yaml` sets `store_date_time_values_as_text: true` for the generator, so
+  `drift_schemas/drift_schema_v1.json` stops disagreeing with
+  `AppDatabase.options`.
+
+**Rationale.** Spec §6 names the deadline explicitly: *"Fixing this before Phase
+2.2 is a schema definition; fixing it afterwards is an encrypted-database
+migration across four platforms."* #14 was decided against spec **v0.1**, which
+had no prompt layer, no rolling summary and no conversation management; v0.2
+added all three, and §6.1 now lists these columns. Phase 1 was merged but never
+released, so no database exists anywhere that a migration could migrate.
+
+The boolean could not survive in any case: §5.2.2's chat templates map roles to
+model-specific markers, and a two-valued field cannot express `system`.
+
+**Rejected alternatives.**
+
+- *Migrate to `schemaVersion 2`* — the cautious-looking option. Rejected: there
+  is no shipped database, so `onUpgrade` would be unreachable code written to
+  reassure rather than to run, and it would permanently enshrine a v0.1 schema as
+  the project's version 1.
+- *A drift enum converter (`intEnum` / `textEnum`) for `role`* — less code.
+  Rejected: it stores the enum's Dart identifier, so renaming a Dart constant
+  silently rewrites the meaning of rows already on disk, and the failure mode for
+  an unknown value is a generated exception far from anything that can explain it.
+- *Keeping `Message` tombstoned like `Conversation`* — §6.1 gives `Message` no
+  `isDeleted` field, so this is not available without inventing schema.
+
+**Consequence — the two halves of a delete.** `deleteConversation` tombstones the
+conversation row and **erases** its messages and summary, in one transaction.
+This is §6.1 read literally (only `Conversation` has `isDeleted`) and it is the
+only reading a privacy product can defend: a "delete" that leaves every word of
+the conversation on disk is a lie, and #4's whole-database encryption protects
+against a stolen device, not against the app itself retaining what the user told
+it to destroy. The row survives as a marker for a future P2P merge; the content
+does not.
+
+**Consequence — one naming deviation, deliberate.** §5.1's illustrative sketch
+calls the message stream `watchConversation`; the interface keeps Phase 1's
+`watchMessages`, because a method named for a conversation that returns a list of
+messages reads backwards at every call site. Every other member matches the
+sketch. Recorded here so the difference is a decision rather than a drift.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

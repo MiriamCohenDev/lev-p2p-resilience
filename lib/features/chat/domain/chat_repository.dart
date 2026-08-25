@@ -8,27 +8,60 @@ import 'message.dart';
 /// (CLAUDE.md: all persistence goes through repositories; never SQL from UI or
 /// domain).
 ///
-/// **Wider than §5.1's illustrative sketch, deliberately.** That sketch lists
-/// [watchMessages] (as `watchConversation`) and [append] only.
-/// [createConversation] is not optional — a message cannot be appended to a
-/// conversation that does not exist, and the foreign key now enforces it.
-/// [watchConversations] is what gives `Conversation.title` a purpose.
-///
-/// There is no delete or rename: product-spec §5 lists no conversation
-/// management action, and §6 describes a chat screen with an input field and a
-/// message window, nothing more.
+/// **One deliberate naming deviation from §5.1's sketch.** The sketch calls the
+/// message stream `watchConversation`; it is [watchMessages] here, because a
+/// method named for a conversation that returns a list of messages reads
+/// backwards at every call site. Every other member matches the sketch. See
+/// technical-decisions #15.
 abstract class ChatRepository {
-  /// All conversations, most recently active first. Re-emits on every change.
+  /// Live conversations, most recently active first. Re-emits on every change.
+  ///
+  /// Tombstoned conversations are excluded — a deleted conversation is gone as
+  /// far as every caller above this interface is concerned.
   Stream<List<Conversation>> watchConversations();
 
   /// Creates and stores a conversation, returning it as stored.
-  Future<Conversation> createConversation({String? title});
+  ///
+  /// [systemPromptVersion] and [modelId] are recorded on the row so a later
+  /// change in either is traceable to the conversations held before it (§5.2.1).
+  Future<Conversation> createConversation({
+    String? title,
+    String? systemPromptVersion,
+    String? modelId,
+  });
+
+  /// One conversation by id, or `null` if it does not exist or is tombstoned.
+  ///
+  /// Needed by the prompt layer: [Conversation.summary] is an input to
+  /// `PromptBuilder.buildSeed`, and the seed is built when a conversation is
+  /// opened rather than when the list is watched.
+  Future<Conversation?> findConversation(String conversationId);
+
+  /// Tombstones a conversation and erases its messages.
+  Future<void> deleteConversation(String conversationId);
 
   /// The messages of one conversation, oldest first. Re-emits on every append.
   Stream<List<Message>> watchMessages(String conversationId);
+
+  /// Reads the messages of one conversation once, oldest first.
+  ///
+  /// The seed is assembled from a snapshot, not from a stream: `buildSeed`
+  /// needs the history as it stands at open time, and awaiting `.first` on a
+  /// watch stream to get it would leave a subscription behind.
+  Future<List<Message>> messagesOf(String conversationId);
 
   /// Stores [message] and marks its conversation as active.
   ///
   /// Throws if the conversation does not exist.
   Future<void> append(Message message);
+
+  /// Persists the rolling summary of [conversationId] (§5.2.3).
+  ///
+  /// [upToMessageId] records how far the summary accounts for; everything after
+  /// it is still carried verbatim in the prompt.
+  Future<void> saveSummary(
+    String conversationId,
+    String summary,
+    String upToMessageId,
+  );
 }

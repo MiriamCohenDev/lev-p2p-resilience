@@ -1,9 +1,12 @@
-import 'package:drift/drift.dart';
+// `isNull` collides with the matcher of the same name; the tests below want the
+// matcher, and nothing here builds a SQL null check.
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lev/core/db/app_database.dart';
 import 'package:lev/features/chat/data/drift_chat_repository.dart';
 import 'package:lev/features/chat/domain/message.dart';
+import 'package:lev/features/chat/domain/message_role.dart';
 
 /// These run against an **unencrypted in-memory** database, on purpose.
 ///
@@ -106,7 +109,7 @@ void main() {
           (await repository.watchMessages(conversation.id).first).single;
       expect(stored.id, sent.id);
       expect(stored.text, 'a reply');
-      expect(stored.fromUser, isFalse);
+      expect(stored.role, MessageRole.assistant);
       expect(stored.createdAt.isAtSameMomentAs(sent.createdAt), isTrue);
     });
 
@@ -214,7 +217,7 @@ void main() {
             id: message.id,
             conversationId: conversation.id,
             text: 'twice',
-            fromUser: true,
+            role: MessageRole.user,
             createdAt: at.add(const Duration(hours: 1)),
           ),
         ),
@@ -230,15 +233,170 @@ void main() {
     });
   });
 
-  test('deleting a conversation takes its messages with it', () async {
-    final conversation = await repository.createConversation();
-    await repository.append(
-      userMessage(conversation.id, 'goes away', DateTime.utc(2026, 8, 24, 17)),
-    );
+  group('deleteConversation', () {
+    test('hides the conversation and takes its messages with it', () async {
+      final conversation = await repository.createConversation();
+      await repository.append(
+        userMessage(conversation.id, 'goes away', DateTime.utc(2026, 8, 24, 17)),
+      );
 
-    await database.chatDao.deleteConversation(conversation.id);
+      await repository.deleteConversation(conversation.id);
 
-    expect(await repository.watchConversations().first, isEmpty);
-    expect(await repository.watchMessages(conversation.id).first, isEmpty);
+      expect(await repository.watchConversations().first, isEmpty);
+      expect(await repository.watchMessages(conversation.id).first, isEmpty);
+      expect(await repository.findConversation(conversation.id), isNull);
+    });
+
+    test('erases the message text rather than tombstoning it', () async {
+      final conversation = await repository.createConversation();
+      await repository.append(
+        userMessage(conversation.id, 'private', DateTime.utc(2026, 8, 24, 17)),
+      );
+
+      await repository.deleteConversation(conversation.id);
+
+      // Straight past the repository: a tombstone that left the words on disk
+      // would still satisfy every assertion above. This is the privacy claim.
+      final rows = await database.select(database.messages).get();
+      expect(rows, isEmpty);
+    });
+
+    test('keeps the conversation row as a tombstone', () async {
+      final conversation = await repository.createConversation(title: 'gone');
+
+      await repository.deleteConversation(conversation.id);
+
+      final rows = await database.select(database.conversations).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.isDeleted, isTrue);
+    });
+
+    test('drops the summary with the messages it was made from', () async {
+      final conversation = await repository.createConversation();
+      await repository.append(
+        userMessage(conversation.id, 'folded', DateTime.utc(2026, 8, 24, 17)),
+      );
+      await repository.saveSummary(conversation.id, 'a summary', 'some-id');
+
+      await repository.deleteConversation(conversation.id);
+
+      final row = (await database.select(database.conversations).get()).single;
+      expect(row.summary, isNull);
+      expect(row.summaryUpToMessageId, isNull);
+    });
+  });
+
+  group('roles', () {
+    test('survive the round trip distinctly', () async {
+      final conversation = await repository.createConversation();
+      final at = DateTime.utc(2026, 8, 24, 18);
+
+      await repository.append(
+        Message.fromUserInput(
+          conversationId: conversation.id,
+          text: 'asked',
+          createdAt: at,
+        ),
+      );
+      await repository.append(
+        Message.fromAssistant(
+          conversationId: conversation.id,
+          text: 'answered',
+          createdAt: at.add(const Duration(seconds: 1)),
+        ),
+      );
+      await repository.append(
+        Message.fromSystem(
+          conversationId: conversation.id,
+          text: 'noted',
+          createdAt: at.add(const Duration(seconds: 2)),
+        ),
+      );
+
+      final stored = await repository.watchMessages(conversation.id).first;
+      expect(
+        stored.map((m) => m.role),
+        [MessageRole.user, MessageRole.assistant, MessageRole.system],
+      );
+    });
+
+    test('are stored under the wire names the spec names', () async {
+      final conversation = await repository.createConversation();
+      await repository.append(
+        userMessage(conversation.id, 'hello', DateTime.utc(2026, 8, 24, 19)),
+      );
+
+      final rows = await database.select(database.messages).get();
+      // The column holds 'user', not '0' or 'MessageRole.user' — what is on
+      // disk is the vocabulary §6.1 specifies, not a Dart implementation detail.
+      expect(rows.single.role, 'user');
+    });
+
+    test('an unknown stored role fails loudly rather than guessing', () async {
+      final conversation = await repository.createConversation();
+      await database.into(database.messages).insert(
+            MessagesCompanion.insert(
+              id: 'forged',
+              conversationId: conversation.id,
+              body: 'from the future',
+              role: 'oracle',
+              createdAt: DateTime.utc(2026, 8, 24, 20),
+            ),
+          );
+
+      await expectLater(
+        repository.messagesOf(conversation.id),
+        throwsA(isA<FormatException>()),
+      );
+    });
+  });
+
+  group('summary', () {
+    test('round-trips through the conversation', () async {
+      final conversation = await repository.createConversation();
+
+      await repository.saveSummary(conversation.id, 'the gist', 'msg-7');
+
+      final stored = await repository.findConversation(conversation.id);
+      expect(stored!.summary, 'the gist');
+      expect(stored.summaryUpToMessageId, 'msg-7');
+    });
+
+    test('is absent on a fresh conversation', () async {
+      final conversation = await repository.createConversation();
+
+      expect(conversation.summary, isNull);
+      expect(conversation.summaryUpToMessageId, isNull);
+    });
+  });
+
+  group('createConversation', () {
+    test('records the prompt version and model it was held under', () async {
+      final conversation = await repository.createConversation(
+        title: 'stamped',
+        systemPromptVersion: '1.0.0',
+        modelId: 'qwen-en-q4',
+      );
+
+      final stored = await repository.findConversation(conversation.id);
+      expect(stored!.systemPromptVersion, '1.0.0');
+      expect(stored.modelId, 'qwen-en-q4');
+    });
+  });
+
+  group('messagesOf', () {
+    test('returns the same snapshot the stream would open with', () async {
+      final conversation = await repository.createConversation();
+      final at = DateTime.utc(2026, 8, 24, 21);
+      await repository.append(userMessage(conversation.id, 'one', at));
+      await repository.append(
+        userMessage(conversation.id, 'two', at.add(const Duration(minutes: 1))),
+      );
+
+      expect(
+        (await repository.messagesOf(conversation.id)).map((m) => m.text),
+        ['one', 'two'],
+      );
+    });
   });
 }
