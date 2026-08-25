@@ -17,6 +17,7 @@ Current and expected occupants (technical-spec §9, build order **v0.2**):
 | 1 | `AppDatabase` + its file location | `db_providers.dart` ✅ |
 | 1 | `ChatRepository` → Drift | `chat_providers.dart` ✅ |
 | 2 | `ModelRegistry`, `ModelSelector`, `Tokenizer`, `LlmService` → **`FakeLlmService`** | `llm_providers.dart` ✅ |
+| 2 | `SystemPrompt`, `SafetyChecker`, `PromptBuilder`, `ConversationSummariser` | `prompt_providers.dart` ✅ |
 | 3.1 | `LlmService` → llama.cpp binding, `Tokenizer` → the engine's own | `llm_providers.dart` |
 | 4 | `TransportService` → no-op stub | — |
 

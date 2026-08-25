@@ -69,5 +69,9 @@ flutter:
   generate: true
 
   assets:
-    # Bundled GGUF model file(s) land here in Phase 2.
+    # The models manifest (technical-spec §5.3). The GGUF file itself lands here
+    # in Phase 3.
     - assets/models/
+    # The versioned system prompt and the safety pattern lists (§5.2.1, §5.2.4).
+    # Assets rather than string literals so both can be tuned without a rebuild.
+    - assets/prompts/

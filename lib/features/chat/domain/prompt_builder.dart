@@ -37,4 +37,20 @@ abstract class PromptBuilder {
   /// in it, and re-sending history would defeat the KV cache the session exists
   /// for (§5.1).
   Prompt buildTurn(Message userMessage, ModelDescriptor model);
+
+  /// The oldest turns that no longer fit, in order.
+  ///
+  /// One method wider than §5.1's illustrative sketch, and necessarily so:
+  /// §5.2.3 requires the turns that fall out of the window to be folded into the
+  /// rolling summary, and something has to say *which* turns those are. Deciding
+  /// it anywhere but here would mean two places computing the same budget and
+  /// eventually disagreeing — at which point turns are either summarised twice
+  /// or lost entirely.
+  ///
+  /// Empty while the whole conversation still fits.
+  List<Message> overflow(
+    Conversation conversation,
+    List<Message> history,
+    ModelDescriptor model,
+  );
 }

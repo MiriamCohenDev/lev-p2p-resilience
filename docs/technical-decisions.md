@@ -576,6 +576,120 @@ where a model is loaded and the number means anything.
 
 ---
 
+## #17 — Context policy: one fitting function, and a summary written after the turn
+
+**Status:** Accepted
+
+**Decision.** `DefaultPromptBuilder` implements §5.2.3's three-tier budget —
+system prompt, then rolling summary, then as many trailing turns as fit — and
+exposes a third method beyond §5.1's sketch, `overflow`, returning the oldest
+turns that no longer fit. Both `buildSeed` and `overflow` are thin wrappers over
+**one private fitting function**. Summarisation runs *after* a turn is on screen,
+in a session of its own, and its result is capped before it is persisted.
+
+**Rationale.**
+
+*One fitting function.* §5.2.3 requires the turns that fall out of the window to
+be folded into the summary, so something has to decide which turns those are.
+Computing it in a second place would eventually disagree with the prompt — and
+the two failure modes are both silent: a turn in neither is lost outright, and a
+turn in both is summarised while still being carried verbatim. A test asserts the
+two agree exactly.
+
+*A session of its own.* Sending the summarisation instruction through the
+conversation's live session would write it into the KV cache that session exists
+to protect — the instruction and its output would become part of the conversation
+the model believes it is having.
+
+*After the turn, not before the next one.* Summarising is a second generation. In
+front of the user it would stall the conversation for the one thing they cannot
+see the point of, so it happens once the reply is already on screen. A failure is
+swallowed: the same turns are offered again next time, which costs a call, not a
+conversation.
+
+*The cap.* §5.2.3 says "capped at a fixed token length" and that cap is the whole
+point — an uncapped summary grows with the conversation and eventually consumes
+the budget it was introduced to bound. It is trimmed by whole sentences, because
+a summary cut mid-clause reads as though the conversation was cut off there, and
+the model is being asked to treat it as fact.
+
+**Rejected alternatives.**
+
+- *Keep `PromptBuilder` at exactly §5.1's two methods and compute the overflow in
+  the notifier* — matches the sketch. Rejected: it puts the budget in two places,
+  and §5.1's code block is explicitly illustrative.
+- *Summarise before assembling the next prompt* — one less method and no stale
+  window. Rejected on latency: it puts a full generation in front of the user's
+  next message.
+- *A fixed "last N turns" window instead of a token budget* — far simpler.
+  Rejected: N that is safe on the smallest model wastes most of the largest one's
+  window, and §8 makes overflowing a defect rather than something to approximate.
+
+**Consequence — an over-budget prompt is a loud failure.** If the system prompt
+alone cannot fit the model's window, `buildSeed` throws `ModelUnavailable` naming
+both. §8 makes exceeding the budget a defect: the engine's response is to
+silently truncate the system prompt, which removes the assistant's stated limits
+while leaving it sounding exactly as confident. Refusing beats answering without
+them.
+
+---
+
+## #18 — The safety layer follows the person, and never replaces the reply
+
+**Status:** Accepted
+
+**Decision.** `AssetSafetyChecker` matches the user's raw message against
+`assets/prompts/safety_patterns_<locale>.json` **before** it reaches the model.
+On a match the UI shows a fixed support message **alongside** the reply. The
+locale is the **UI** locale, not the model's. A language with no pattern file
+gets `NeverMatchingSafetyChecker`. A corpus of positive *and negative* cases
+covers both shipped locales.
+
+**Rationale.**
+
+*Deterministic.* §5.2.4's argument, restated: a guarantee that depends on the
+inference quality of a 4-bit model running on an old phone is not a guarantee.
+Nothing in this layer consults a model, so the corpus passes whichever engine is
+registered — which is the strongest form of that requirement, not merely a test
+of it.
+
+*Alongside, never instead.* Replacing the answer with a canned notice teaches a
+person in distress that saying the wrong thing gets them shut out of the
+conversation. The message is stored and answered like any other.
+
+*The UI locale.* §10's Hebrew gap and #11 together mean a Hebrew-reading user gets
+a Hebrew UI and an English assistant. The person still writes in Hebrew, so the
+patterns that must catch them are Hebrew — following the model's language here
+would leave exactly the users #11 exists for uncovered. The locale is read from
+the widget tree, the only place it is actually known.
+
+*Negative cases carry as much weight as positive ones.* "Work is killing me" and
+"I could die of embarrassment" must not fire. A layer that goes off on every hard
+day is one people learn to scroll past within a week — at which point it looks
+like care while functioning as noise, which is worse than absent.
+
+**Rejected alternatives.**
+
+- *Ask the model to classify the message* — better recall, and unusable here for
+  the reason above. It also puts the distressed message through a second
+  generation before the user sees anything.
+- *Patterns in Dart source* — no asset loading, no parse failures. Rejected:
+  §5.2.4 requires a localisable list, and tuning it would then mean a rebuild.
+- *Fail closed when a locale has no pattern file* — safer-sounding. Rejected: the
+  notice is supplementary, the model still answers, and taking the chat down over
+  a missing list helps nobody. Both shipped locales are covered by the corpus, so
+  this is a fallback for a language nobody has written patterns for yet, not an
+  accepted state.
+
+**Consequence.** Adding a language means an asset file, a corpus entry and an
+entry in `safetyLocales` — no code change. Widget tests substitute the pattern
+list rather than loading it: `rootBundle` caches the `Future` it returns, and a
+cached asset future does not resolve again inside a later test's `fake_async`
+zone, so the first test in a file would load it and every test after would hang
+waiting on it. The real assets are parsed and checked in their own test files.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

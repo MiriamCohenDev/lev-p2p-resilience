@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/prompt_providers.dart';
 import '../../../core/l10n/app_localizations.dart';
 import 'chat_notifier.dart';
 import 'chat_state.dart';
@@ -13,6 +14,26 @@ import 'widgets/message_bubble.dart';
 /// nothing in this file changes.
 class ChatScreen extends ConsumerWidget {
   const ChatScreen({required this.conversationId, super.key});
+
+  final String conversationId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The safety layer is localised for the person, not the model (§5.2.4,
+    // #11): a Hebrew-reading user gets a Hebrew UI and an English assistant, and
+    // must still be caught by patterns written in the language they typed in.
+    // This is the only place the real locale is known.
+    return ProviderScope(
+      overrides: [
+        safetyLocaleProvider.overrideWithValue(Localizations.localeOf(context)),
+      ],
+      child: _ChatScaffold(conversationId: conversationId),
+    );
+  }
+}
+
+class _ChatScaffold extends ConsumerWidget {
+  const _ChatScaffold({required this.conversationId});
 
   final String conversationId;
 

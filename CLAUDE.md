@@ -35,12 +35,20 @@ These are hard constraints. Violating any of them is a defect, not a trade-off.
 
 ## Build order
 Develop in the phased order defined in the technical spec (Section 9). Do not skip ahead:
-1. Project scaffold
-2. Storage + security foundation (encrypted DB, key management)
-3. LLM integration (llama.cpp, model registry, streaming)
-4. Chat feature (end-to-end)
-5. Mutual-aid feature (local-only, with transport stub)
-6. Packaging + offline distribution (APK, Windows, macOS, Linux)
+0. Project scaffold
+1. Storage + security foundation (encrypted DB, key management)
+2. Chat, prompt layer & context management — end-to-end against a **fake** engine, no native code
+3. Real LLM engine (llama.cpp, model registry, streaming) — swapped in behind the Phase 2 contracts
+4. Mutual-aid feature (local-only, with transport stub)
+5. Packaging + offline distribution (APK, Windows, macOS, Linux)
+
+**Note the order of 2 and 3: spec v0.2 inverted them.** The chat is built and
+finished first, against `FakeLlmService`, because the native binding is the
+riskiest and most environment-dependent part of the build — and because
+everything the chat actually *is* (history, context assembly, the system prompt,
+safety) is pure Dart that needs no model to be correct. Phase 3.1 replaces one
+binding in `lib/core/di/llm_providers.dart`; if it needs to touch anything under
+`features/chat`, the abstraction has failed.
 
 Later releases (only when asked): iOS support, real P2P BLE-mesh transport, Hebrew model.
 

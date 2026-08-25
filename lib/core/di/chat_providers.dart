@@ -1,12 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/chat/data/drift_chat_repository.dart';
-import '../../features/chat/data/provisional_prompt_builder.dart';
 import '../../features/chat/domain/chat_repository.dart';
 import '../../features/chat/domain/conversation.dart';
-import '../../features/chat/domain/prompt_builder.dart';
 import 'db_providers.dart';
-import 'llm_providers.dart';
 
 /// The chat feature's storage binding.
 ///
@@ -29,12 +26,6 @@ final conversationsProvider = StreamProvider<List<Conversation>>((ref) async* {
   yield* repository.watchConversations();
 });
 
-/// How a conversation is rendered into a prompt (technical-spec §5.2).
-///
-/// **Provisional binding.** Phase 2.3 replaces `ProvisionalPromptBuilder` with
-/// the real one — versioned system prompt, per-family chat template, the
-/// three-tier token budget and rolling-summary folding. It changes here and
-/// nowhere else.
-final promptBuilderProvider = Provider<PromptBuilder>((ref) {
-  return ProvisionalPromptBuilder(ref.watch(tokenizerProvider));
-});
+// The prompt layer itself lives in `prompt_providers.dart` — it has enough
+// moving parts (system prompt, chat templates, budget, safety) to be its own
+// file rather than a tail on this one.

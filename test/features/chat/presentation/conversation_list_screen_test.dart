@@ -76,7 +76,7 @@ void main() {
     // hangs rather than failing.
     final conversations = await harness.conversations();
     expect(conversations, hasLength(1));
-    expect(conversations.single.modelId, ChatHarness.model.id);
+    expect(conversations.single.modelId, harness.model.id);
   });
 
   chatWidgetTest('deleting asks first, and does nothing if declined',

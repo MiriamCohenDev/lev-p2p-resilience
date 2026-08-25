@@ -210,6 +210,81 @@ void main() {
     }, mode: FakeEngineMode.stall);
   });
 
+  group('the safety layer (§5.2.4)', () {
+    chatWidgetTest('surfaces its notice alongside the reply, not instead of it',
+        (tester, harness) async {
+      final id = await conversationIn(harness);
+
+      await harness.pump(tester, ChatScreen(conversationId: id));
+      await send(tester, 'I want to die');
+
+      // Both. Replacing the answer with a canned notice would tell someone in
+      // distress that saying the wrong thing gets them shut out.
+      expect(find.textContaining('reach out to someone'), findsOneWidget);
+      expect(find.text('I hear you.'), findsOneWidget);
+
+      // And the message itself is still a normal part of the conversation.
+      final stored = await harness.repository.messagesOf(id);
+      expect(stored.map((m) => m.text), ['I want to die', 'I hear you.']);
+    }, replies: ['I hear you.']);
+
+    chatWidgetTest('shows nothing on an ordinary message',
+        (tester, harness) async {
+      final id = await conversationIn(harness);
+
+      await harness.pump(tester, ChatScreen(conversationId: id));
+      await send(tester, 'I had a hard day');
+
+      expect(find.textContaining('reach out to someone'), findsNothing);
+    }, replies: ['That sounds tiring.']);
+
+    chatWidgetTest('clears the notice once the next message is ordinary',
+        (tester, harness) async {
+      final id = await conversationIn(harness);
+
+      await harness.pump(tester, ChatScreen(conversationId: id));
+      await send(tester, 'I want to die');
+      expect(find.textContaining('reach out to someone'), findsOneWidget);
+
+      await send(tester, 'anyway, about work');
+
+      // It belongs to the message that triggered it, not to the conversation.
+      expect(find.textContaining('reach out to someone'), findsNothing);
+    }, replies: ['I hear you.', 'Tell me about work.']);
+  });
+
+  chatWidgetTest(
+      'turns that fall out of the window are folded into the summary (§5.2.3)',
+      (tester, harness) async {
+    final id = await conversationIn(harness);
+
+    await harness.pump(tester, ChatScreen(conversationId: id));
+
+    // A budget this tight overflows within a few turns, so the fold is reached
+    // without writing a conversation thousands of tokens long.
+    for (var i = 0; i < 6; i++) {
+      await send(tester, 'message number $i with some words in it');
+    }
+
+    final conversation = await harness.repository.findConversation(id);
+    expect(conversation!.summary, isNotNull);
+    expect(conversation.summary, isNotEmpty);
+    // The summary records how far it accounts for, so the turns still carried
+    // verbatim are not summarised twice.
+    expect(conversation.summaryUpToMessageId, isNotNull);
+  }, contextTokens: 128, replies: ['A short reply.']);
+
+  chatWidgetTest('the summary is not written while the conversation still fits',
+      (tester, harness) async {
+    final id = await conversationIn(harness);
+
+    await harness.pump(tester, ChatScreen(conversationId: id));
+    await send(tester, 'hello');
+
+    final conversation = await harness.repository.findConversation(id);
+    expect(conversation!.summary, isNull);
+  }, replies: ['ok']);
+
   chatWidgetTest('the chat renders right-to-left in Hebrew',
       (tester, harness) async {
     final id = await conversationIn(harness);

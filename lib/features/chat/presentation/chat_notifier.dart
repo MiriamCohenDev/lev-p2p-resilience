@@ -5,11 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/chat_providers.dart';
 import '../../../core/di/llm_providers.dart';
+import '../../../core/di/prompt_providers.dart';
 import '../../../llm/model_descriptor.dart';
+import '../data/conversation_summariser.dart';
 import '../domain/chat_repository.dart';
 import '../domain/llm_service.dart';
 import '../domain/message.dart';
 import '../domain/prompt_builder.dart';
+import '../domain/safety_checker.dart';
 import 'chat_state.dart';
 
 /// One open conversation, with its live [LlmSession] (technical-spec §5.1).
@@ -31,6 +34,9 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
 
   late final ChatRepository _repository;
   late final PromptBuilder _promptBuilder;
+  late final SafetyChecker _safetyChecker;
+  late final ConversationSummariser _summariser;
+  late final LlmService _llm;
   late final ModelDescriptor _model;
   LlmSession? _session;
 
@@ -78,14 +84,16 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
 
     final history = await completer.future;
 
-    final llm = await ref.watch(llmServiceProvider.future);
+    _llm = await ref.watch(llmServiceProvider.future);
     _model = await ref.watch(activeModelProvider.future);
-    _promptBuilder = ref.watch(promptBuilderProvider);
+    _promptBuilder = await ref.watch(promptBuilderProvider.future);
+    _safetyChecker = await ref.watch(safetyCheckerProvider.future);
+    _summariser = ref.watch(conversationSummariserProvider);
 
     // The one prefill §5.1 describes. The screen shows `AsyncLoading` across
     // it; `isPrefilling` covers a re-prefill on an already-built state.
     final seed = _promptBuilder.buildSeed(conversation, history, _model);
-    final session = await llm.openSession(seed: seed);
+    final session = await _llm.openSession(seed: seed);
     _session = session;
     ref.onDispose(session.dispose);
 
@@ -101,8 +109,20 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
     final session = _session;
     if (session == null) return;
 
+    // Before the model sees it, and independent of what the model does with it
+    // (§5.2.4). The notice is shown alongside the reply, never instead of it —
+    // replacing the answer would tell someone in distress that saying the wrong
+    // thing gets them shut out of the conversation.
+    final verdict = _safetyChecker.evaluate(trimmed);
+
     state = AsyncData(
-      current.copyWith(isTyping: true, streamingText: '', clearFailure: true),
+      current.copyWith(
+        isTyping: true,
+        streamingText: '',
+        clearFailure: true,
+        safetyNotice: verdict.supportMessage,
+        clearSafetyNotice: !verdict.matched,
+      ),
     );
 
     final userMessage = Message.fromUserInput(
@@ -199,6 +219,34 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
         clearFailure: failure == null,
       ),
     );
+
+    await _foldOverflowIntoSummary();
+  }
+
+  /// Folds turns that no longer fit into the rolling summary (§5.2.3).
+  ///
+  /// Runs after the turn is on screen, not before the next one is sent: this
+  /// asks the model for a second generation, and doing it in front of the user
+  /// would stall the conversation for the one thing they cannot see the point
+  /// of. A failure here is swallowed — the same turns are simply offered again
+  /// next time, which is a wasted call, not a broken conversation.
+  Future<void> _foldOverflowIntoSummary() async {
+    final conversation = await _repository.findConversation(conversationId);
+    if (conversation == null) return;
+
+    final history = await _repository.messagesOf(conversationId);
+    final folded = _promptBuilder.overflow(conversation, history, _model);
+    if (folded.isEmpty) return;
+
+    final summary = await _summariser.summarise(
+      llm: _llm,
+      model: _model,
+      folded: folded,
+      previousSummary: conversation.summary,
+    );
+    if (summary == null || summary.isEmpty) return;
+
+    await _repository.saveSummary(conversationId, summary, folded.last.id);
   }
 
   /// Names the conversation after its opening message, once.
