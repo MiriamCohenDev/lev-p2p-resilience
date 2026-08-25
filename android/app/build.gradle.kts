@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.example.lev"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage 11 declares an AAR metadata minimum of API 37, so
+    // it cannot be compiled against Flutter's current default (36).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
