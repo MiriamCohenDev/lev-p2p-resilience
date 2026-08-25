@@ -514,6 +514,68 @@ sketch. Recorded here so the difference is a decision rather than a drift.
 
 ---
 
+## #16 — LLM contracts: interfaces in the chat domain, `ModelDescriptor` in `lib/llm/`
+
+**Status:** Accepted
+
+**Decision.** The Phase 2.1 contracts are split across two places, and the split
+is not arbitrary:
+
+- `features/chat/domain/` holds `LlmService`, `LlmSession`, `Prompt`,
+  `Tokenizer`, `PromptBuilder`, `SafetyChecker` and a sealed `LlmException`
+  hierarchy — the things the chat *talks to*.
+- `lib/llm/` holds `ModelDescriptor`, `ModelRegistry` and `ModelSelector` — the
+  things that describe *which model*, loaded from `assets/models/models.json`.
+
+The chat domain imports `lib/llm/model_descriptor.dart`. That is allowed:
+`lib/llm/` is shared infrastructure rather than a feature, so §3.4's "a feature
+never imports another feature's `presentation` or `data`" does not apply, and
+`ModelDescriptor` is pure Dart config with no framework or platform dependency,
+so §3.2's inward-pointing rule is intact.
+
+**Rationale.** §3.4 assigns these folders directly, and §5.3 puts the descriptor
+with the registry. The deeper reason is that the two have different lifetimes: the
+interfaces are code that changes when the *chat* changes, while the registry is
+**data** that changes when a *model* is added. §5.3 requires adding a model to be
+a manifest entry plus a GGUF file with no change under `features/chat`, and
+Phase 3.3 exists to verify exactly that. Putting descriptors in the chat feature
+would make the first Hebrew model a code change in the feature the claim is about.
+
+**Rejected alternatives.**
+
+- *`ModelDescriptor` in `features/chat/domain/`* — removes the cross-directory
+  import and looks tidier. Rejected: it makes the chat feature the owner of model
+  configuration, which is the coupling §5.3 and Phase 3.3 are designed to prevent.
+- *A drift-style enum for `ModelDescriptor.family`* — type safety for free.
+  Rejected for the same reason: a new family would then be a Dart edit, when the
+  whole point is that it is a manifest edit. An unknown family fails when a
+  template is requested for it, which is where the failure is actionable.
+- *Letting `LlmService` take `List<Message>` and format internally* — the v0.1
+  shape. Rejected in spec v0.2 §4 and restated here: an engine that formats raw
+  history must know every model's conventions, so a model swap becomes an engine
+  rewrite.
+
+**Consequence — the fake is a product decision, not a test double.**
+`FakeLlmService` ships in `features/chat/data/` beside the real implementation,
+not in `test/`. §9's Phase 2 is built and *finished* against it, so its failure
+modes (`failBeforeFirstToken`, `failMidGeneration`, `stall`, and a configurable
+prefill delay) are the states the Phase 2.2 UI is written for. Two behaviours are
+load-bearing and are asserted directly:
+
+1. **Cancelling a subscription stops generation**, not merely delivery. A
+   producer that keeps running behind a dropped stream holds the model busy and
+   burns the battery §8 asks us to watch.
+2. **A stall leaves the stream open.** An early implementation closed it through
+   a `finally`, which delivers a done event — the one thing a stalled engine does
+   not do. A UI validated against that would have looked correct in tests and
+   hung in front of a user.
+
+`deviceRamMbProvider` reports a value that admits every model for now; §9's
+Phase 3.2 replaces that binding with a real measurement, which is the first phase
+where a model is loaded and the number means anything.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).
