@@ -7,8 +7,27 @@
   "homeOpenChat": "התחלת שיחה",
   "homeOpenTasks": "בקשות עזרה",
 
+  "conversationsTitle": "שיחות",
+  "conversationsEmpty": "עדיין אין שיחות. אפשר להתחיל מתי שנוח לך.",
+  "conversationsNew": "שיחה חדשה",
+  "conversationUntitled": "שיחה ללא כותרת",
+  "conversationDelete": "מחיקה",
+  "conversationDeleteTitle": "למחוק את השיחה הזאת?",
+  "conversationDeleteBody": "ההודעות שלה יימחקו מהמכשיר הזה. אי אפשר לבטל את הפעולה.",
+
   "chatTitle": "שיחה",
-  "chatComingSoon": "השיחה התומכת עדיין לא נבנתה.",
+  "chatInputHint": "כתיבת הודעה",
+  "chatSend": "שליחה",
+  "chatStop": "עצירה",
+  "chatTyping": "לב כותבת…",
+  "chatPreparing": "מכינה את השיחה…",
+  "chatEmpty": "אפשר לכתוב כל מה שעל הלב.",
+  "chatFailed": "לא הצלחנו לסיים את התשובה.",
+  "chatLoadFailed": "לא הצלחנו לפתוח את השיחה הזאת.",
+
+  "retry": "לנסות שוב",
+  "dismiss": "סגירה",
+  "cancel": "ביטול",
 
   "tasksTitle": "בקשות עזרה",
   "tasksComingSoon": "העזרה ההדדית עדיין לא נבנתה.",

@@ -116,7 +116,7 @@ abstract class AppLocalizations {
   /// **'LEV runs entirely on your device. Talk things through with a local assistant, or lend and receive a hand nearby. No account, no server, nothing leaves this device.'**
   String get homeDescription;
 
-  /// Home screen button that navigates to the Chat screen
+  /// Home screen button that navigates to the conversation list
   ///
   /// In en, this message translates to:
   /// **'Start a conversation'**
@@ -128,17 +128,119 @@ abstract class AppLocalizations {
   /// **'Help requests'**
   String get homeOpenTasks;
 
-  /// App bar title of the Chat screen
+  /// App bar title of the conversation list screen
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get conversationsTitle;
+
+  /// Shown on the conversation list when nothing has been saved yet
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations yet. Start one whenever you are ready.'**
+  String get conversationsEmpty;
+
+  /// Button that creates a conversation and opens it
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation'**
+  String get conversationsNew;
+
+  /// List entry for a conversation with no message in it yet, so it has no derived title. Deliberately different wording from conversationsNew, which is the button that creates one
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled conversation'**
+  String get conversationUntitled;
+
+  /// Action that deletes a conversation
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get conversationDelete;
+
+  /// Title of the confirmation dialog before deleting a conversation
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this conversation?'**
+  String get conversationDeleteTitle;
+
+  /// Body of the delete-conversation confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Its messages will be erased from this device. This cannot be undone.'**
+  String get conversationDeleteBody;
+
+  /// App bar title of the Chat screen when the conversation has no derived title
   ///
   /// In en, this message translates to:
   /// **'Conversation'**
   String get chatTitle;
 
-  /// Placeholder shown on the Chat screen until the feature is implemented
+  /// Placeholder in the chat message field
   ///
   /// In en, this message translates to:
-  /// **'The supportive chat is not built yet.'**
-  String get chatComingSoon;
+  /// **'Write a message'**
+  String get chatInputHint;
+
+  /// Button that sends the typed message
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get chatSend;
+
+  /// Button that stops a reply while it is being written
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get chatStop;
+
+  /// Shown while the assistant's reply is streaming in
+  ///
+  /// In en, this message translates to:
+  /// **'LEV is writing…'**
+  String get chatTyping;
+
+  /// Shown while the conversation is being prefilled, before it can be used
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the conversation…'**
+  String get chatPreparing;
+
+  /// Shown in an open conversation that has no messages yet
+  ///
+  /// In en, this message translates to:
+  /// **'Say whatever is on your mind.'**
+  String get chatEmpty;
+
+  /// Shown when generation fails part-way; anything already written stays on screen
+  ///
+  /// In en, this message translates to:
+  /// **'The reply could not be finished.'**
+  String get chatFailed;
+
+  /// Shown when the conversation itself cannot be loaded
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation could not be opened.'**
+  String get chatLoadFailed;
+
+  /// Generic action that retries the operation that failed
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get retry;
+
+  /// Generic action that acknowledges and hides a message
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismiss;
+
+  /// Generic action that abandons a dialog without doing anything
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
 
   /// App bar title of the Tasks screen
   ///

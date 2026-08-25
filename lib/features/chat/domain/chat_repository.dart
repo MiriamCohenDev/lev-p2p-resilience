@@ -40,6 +40,15 @@ abstract class ChatRepository {
   /// Tombstones a conversation and erases its messages.
   Future<void> deleteConversation(String conversationId);
 
+  /// Sets a conversation's title.
+  ///
+  /// **Derived, not user-edited.** Product-spec §5 lists no rename action, and
+  /// none is offered. A conversation is created before its first message exists,
+  /// so it has nothing to be called; the chat sets the title from the opening
+  /// message so the conversation list is something a person can navigate rather
+  /// than a column of identical placeholders.
+  Future<void> updateTitle(String conversationId, String title);
+
   /// The messages of one conversation, oldest first. Re-emits on every append.
   Stream<List<Message>> watchMessages(String conversationId);
 

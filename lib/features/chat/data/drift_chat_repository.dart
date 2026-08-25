@@ -57,6 +57,10 @@ class DriftChatRepository implements ChatRepository {
       _dao.deleteConversation(conversationId);
 
   @override
+  Future<void> updateTitle(String conversationId, String title) =>
+      _dao.updateTitle(conversationId, title);
+
+  @override
   Stream<List<Message>> watchMessages(String conversationId) => _dao
       .watchMessages(conversationId)
       .map((rows) => rows.map(_toDomainMessage).toList());

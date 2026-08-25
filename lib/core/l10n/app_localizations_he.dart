@@ -26,10 +26,62 @@ class AppLocalizationsHe extends AppLocalizations {
   String get homeOpenTasks => 'בקשות עזרה';
 
   @override
+  String get conversationsTitle => 'שיחות';
+
+  @override
+  String get conversationsEmpty => 'עדיין אין שיחות. אפשר להתחיל מתי שנוח לך.';
+
+  @override
+  String get conversationsNew => 'שיחה חדשה';
+
+  @override
+  String get conversationUntitled => 'שיחה ללא כותרת';
+
+  @override
+  String get conversationDelete => 'מחיקה';
+
+  @override
+  String get conversationDeleteTitle => 'למחוק את השיחה הזאת?';
+
+  @override
+  String get conversationDeleteBody =>
+      'ההודעות שלה יימחקו מהמכשיר הזה. אי אפשר לבטל את הפעולה.';
+
+  @override
   String get chatTitle => 'שיחה';
 
   @override
-  String get chatComingSoon => 'השיחה התומכת עדיין לא נבנתה.';
+  String get chatInputHint => 'כתיבת הודעה';
+
+  @override
+  String get chatSend => 'שליחה';
+
+  @override
+  String get chatStop => 'עצירה';
+
+  @override
+  String get chatTyping => 'לב כותבת…';
+
+  @override
+  String get chatPreparing => 'מכינה את השיחה…';
+
+  @override
+  String get chatEmpty => 'אפשר לכתוב כל מה שעל הלב.';
+
+  @override
+  String get chatFailed => 'לא הצלחנו לסיים את התשובה.';
+
+  @override
+  String get chatLoadFailed => 'לא הצלחנו לפתוח את השיחה הזאת.';
+
+  @override
+  String get retry => 'לנסות שוב';
+
+  @override
+  String get dismiss => 'סגירה';
+
+  @override
+  String get cancel => 'ביטול';
 
   @override
   String get tasksTitle => 'בקשות עזרה';

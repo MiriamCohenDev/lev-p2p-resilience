@@ -31,7 +31,7 @@ class HomeScreen extends StatelessWidget {
                   Text(l10n.homeDescription, style: textTheme.bodyLarge),
                   const SizedBox(height: 40),
                   FilledButton(
-                    onPressed: () => context.go(AppRoutes.chat),
+                    onPressed: () => context.go(AppRoutes.conversations),
                     child: Text(l10n.homeOpenChat),
                   ),
                   const SizedBox(height: 12),

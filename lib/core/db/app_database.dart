@@ -201,6 +201,11 @@ class ChatDao extends DatabaseAccessor<AppDatabase> with _$ChatDaoMixin {
     });
   }
 
+  Future<void> updateTitle(String conversationId, String title) {
+    return (update(conversations)..where((c) => c.id.equals(conversationId)))
+        .write(ConversationsCompanion(title: Value(title)));
+  }
+
   /// Records the rolling summary of a conversation (§5.2.3).
   Future<void> saveSummary(
     String conversationId,

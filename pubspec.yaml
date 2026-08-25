@@ -24,6 +24,9 @@ dependencies:
   uuid: ^4.6.0
   # Localization support: English + Hebrew UI, incl. RTL (technical-decisions #11).
   intl: ^0.20.3
+  # Grapheme-safe string handling. Direct, not transitive: truncating a title by
+  # code unit splits surrogate pairs and Hebrew combining marks.
+  characters: ^1.4.1
   cryptography_plus: ^3.0.0
   flutter_secure_storage: ^11.0.0
 
