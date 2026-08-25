@@ -46,3 +46,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# AI agent tooling installed into the working copy. Local to whoever installed
+# it, not part of the project — LEV's own agent instructions live in CLAUDE.md.
+.agents/
+.claude/
+skills-lock.json
