@@ -453,6 +453,243 @@ tests and the repository tests assert that an orphan insert is rejected.
 
 ---
 
+## #15 — Chat schema realigned to technical-spec v0.2, in place at `schemaVersion 1`
+
+**Status:** Accepted — supersedes the schema half of #14
+
+**Decision.** The chat schema now matches technical-spec v0.2 §6.1 field for field,
+changed **in place at `schemaVersion 1`** rather than migrated to schema 2:
+
+- `Messages.fromUser` (boolean) → `Messages.role` (text: `user` | `assistant` |
+  `system`). The vocabulary is owned by `MessageRole.wireName` in the domain, and
+  the column stays a plain text column rather than a drift enum converter so that
+  an unrecognised value fails loudly in one place with a `FormatException`.
+- `Conversations` gains `summary`, `summaryUpToMessageId`, `systemPromptVersion`,
+  `modelId` and `isDeleted`.
+- `ChatRepository` gains `deleteConversation`, `saveSummary`, `findConversation`
+  and `messagesOf`.
+- An index on `messages (conversation_id, created_at)` — the one query the chat
+  runs constantly.
+- `build.yaml` sets `store_date_time_values_as_text: true` for the generator, so
+  `drift_schemas/drift_schema_v1.json` stops disagreeing with
+  `AppDatabase.options`.
+
+**Rationale.** Spec §6 names the deadline explicitly: *"Fixing this before Phase
+2.2 is a schema definition; fixing it afterwards is an encrypted-database
+migration across four platforms."* #14 was decided against spec **v0.1**, which
+had no prompt layer, no rolling summary and no conversation management; v0.2
+added all three, and §6.1 now lists these columns. Phase 1 was merged but never
+released, so no database exists anywhere that a migration could migrate.
+
+The boolean could not survive in any case: §5.2.2's chat templates map roles to
+model-specific markers, and a two-valued field cannot express `system`.
+
+**Rejected alternatives.**
+
+- *Migrate to `schemaVersion 2`* — the cautious-looking option. Rejected: there
+  is no shipped database, so `onUpgrade` would be unreachable code written to
+  reassure rather than to run, and it would permanently enshrine a v0.1 schema as
+  the project's version 1.
+- *A drift enum converter (`intEnum` / `textEnum`) for `role`* — less code.
+  Rejected: it stores the enum's Dart identifier, so renaming a Dart constant
+  silently rewrites the meaning of rows already on disk, and the failure mode for
+  an unknown value is a generated exception far from anything that can explain it.
+- *Keeping `Message` tombstoned like `Conversation`* — §6.1 gives `Message` no
+  `isDeleted` field, so this is not available without inventing schema.
+
+**Consequence — the two halves of a delete.** `deleteConversation` tombstones the
+conversation row and **erases** its messages and summary, in one transaction.
+This is §6.1 read literally (only `Conversation` has `isDeleted`) and it is the
+only reading a privacy product can defend: a "delete" that leaves every word of
+the conversation on disk is a lie, and #4's whole-database encryption protects
+against a stolen device, not against the app itself retaining what the user told
+it to destroy. The row survives as a marker for a future P2P merge; the content
+does not.
+
+**Consequence — one naming deviation, deliberate.** §5.1's illustrative sketch
+calls the message stream `watchConversation`; the interface keeps Phase 1's
+`watchMessages`, because a method named for a conversation that returns a list of
+messages reads backwards at every call site. Every other member matches the
+sketch. Recorded here so the difference is a decision rather than a drift.
+
+---
+
+## #16 — LLM contracts: interfaces in the chat domain, `ModelDescriptor` in `lib/llm/`
+
+**Status:** Accepted
+
+**Decision.** The Phase 2.1 contracts are split across two places, and the split
+is not arbitrary:
+
+- `features/chat/domain/` holds `LlmService`, `LlmSession`, `Prompt`,
+  `Tokenizer`, `PromptBuilder`, `SafetyChecker` and a sealed `LlmException`
+  hierarchy — the things the chat *talks to*.
+- `lib/llm/` holds `ModelDescriptor`, `ModelRegistry` and `ModelSelector` — the
+  things that describe *which model*, loaded from `assets/models/models.json`.
+
+The chat domain imports `lib/llm/model_descriptor.dart`. That is allowed:
+`lib/llm/` is shared infrastructure rather than a feature, so §3.4's "a feature
+never imports another feature's `presentation` or `data`" does not apply, and
+`ModelDescriptor` is pure Dart config with no framework or platform dependency,
+so §3.2's inward-pointing rule is intact.
+
+**Rationale.** §3.4 assigns these folders directly, and §5.3 puts the descriptor
+with the registry. The deeper reason is that the two have different lifetimes: the
+interfaces are code that changes when the *chat* changes, while the registry is
+**data** that changes when a *model* is added. §5.3 requires adding a model to be
+a manifest entry plus a GGUF file with no change under `features/chat`, and
+Phase 3.3 exists to verify exactly that. Putting descriptors in the chat feature
+would make the first Hebrew model a code change in the feature the claim is about.
+
+**Rejected alternatives.**
+
+- *`ModelDescriptor` in `features/chat/domain/`* — removes the cross-directory
+  import and looks tidier. Rejected: it makes the chat feature the owner of model
+  configuration, which is the coupling §5.3 and Phase 3.3 are designed to prevent.
+- *A drift-style enum for `ModelDescriptor.family`* — type safety for free.
+  Rejected for the same reason: a new family would then be a Dart edit, when the
+  whole point is that it is a manifest edit. An unknown family fails when a
+  template is requested for it, which is where the failure is actionable.
+- *Letting `LlmService` take `List<Message>` and format internally* — the v0.1
+  shape. Rejected in spec v0.2 §4 and restated here: an engine that formats raw
+  history must know every model's conventions, so a model swap becomes an engine
+  rewrite.
+
+**Consequence — the fake is a product decision, not a test double.**
+`FakeLlmService` ships in `features/chat/data/` beside the real implementation,
+not in `test/`. §9's Phase 2 is built and *finished* against it, so its failure
+modes (`failBeforeFirstToken`, `failMidGeneration`, `stall`, and a configurable
+prefill delay) are the states the Phase 2.2 UI is written for. Two behaviours are
+load-bearing and are asserted directly:
+
+1. **Cancelling a subscription stops generation**, not merely delivery. A
+   producer that keeps running behind a dropped stream holds the model busy and
+   burns the battery §8 asks us to watch.
+2. **A stall leaves the stream open.** An early implementation closed it through
+   a `finally`, which delivers a done event — the one thing a stalled engine does
+   not do. A UI validated against that would have looked correct in tests and
+   hung in front of a user.
+
+`deviceRamMbProvider` reports a value that admits every model for now; §9's
+Phase 3.2 replaces that binding with a real measurement, which is the first phase
+where a model is loaded and the number means anything.
+
+---
+
+## #17 — Context policy: one fitting function, and a summary written after the turn
+
+**Status:** Accepted
+
+**Decision.** `DefaultPromptBuilder` implements §5.2.3's three-tier budget —
+system prompt, then rolling summary, then as many trailing turns as fit — and
+exposes a third method beyond §5.1's sketch, `overflow`, returning the oldest
+turns that no longer fit. Both `buildSeed` and `overflow` are thin wrappers over
+**one private fitting function**. Summarisation runs *after* a turn is on screen,
+in a session of its own, and its result is capped before it is persisted.
+
+**Rationale.**
+
+*One fitting function.* §5.2.3 requires the turns that fall out of the window to
+be folded into the summary, so something has to decide which turns those are.
+Computing it in a second place would eventually disagree with the prompt — and
+the two failure modes are both silent: a turn in neither is lost outright, and a
+turn in both is summarised while still being carried verbatim. A test asserts the
+two agree exactly.
+
+*A session of its own.* Sending the summarisation instruction through the
+conversation's live session would write it into the KV cache that session exists
+to protect — the instruction and its output would become part of the conversation
+the model believes it is having.
+
+*After the turn, not before the next one.* Summarising is a second generation. In
+front of the user it would stall the conversation for the one thing they cannot
+see the point of, so it happens once the reply is already on screen. A failure is
+swallowed: the same turns are offered again next time, which costs a call, not a
+conversation.
+
+*The cap.* §5.2.3 says "capped at a fixed token length" and that cap is the whole
+point — an uncapped summary grows with the conversation and eventually consumes
+the budget it was introduced to bound. It is trimmed by whole sentences, because
+a summary cut mid-clause reads as though the conversation was cut off there, and
+the model is being asked to treat it as fact.
+
+**Rejected alternatives.**
+
+- *Keep `PromptBuilder` at exactly §5.1's two methods and compute the overflow in
+  the notifier* — matches the sketch. Rejected: it puts the budget in two places,
+  and §5.1's code block is explicitly illustrative.
+- *Summarise before assembling the next prompt* — one less method and no stale
+  window. Rejected on latency: it puts a full generation in front of the user's
+  next message.
+- *A fixed "last N turns" window instead of a token budget* — far simpler.
+  Rejected: N that is safe on the smallest model wastes most of the largest one's
+  window, and §8 makes overflowing a defect rather than something to approximate.
+
+**Consequence — an over-budget prompt is a loud failure.** If the system prompt
+alone cannot fit the model's window, `buildSeed` throws `ModelUnavailable` naming
+both. §8 makes exceeding the budget a defect: the engine's response is to
+silently truncate the system prompt, which removes the assistant's stated limits
+while leaving it sounding exactly as confident. Refusing beats answering without
+them.
+
+---
+
+## #18 — The safety layer follows the person, and never replaces the reply
+
+**Status:** Accepted
+
+**Decision.** `AssetSafetyChecker` matches the user's raw message against
+`assets/prompts/safety_patterns_<locale>.json` **before** it reaches the model.
+On a match the UI shows a fixed support message **alongside** the reply. The
+locale is the **UI** locale, not the model's. A language with no pattern file
+gets `NeverMatchingSafetyChecker`. A corpus of positive *and negative* cases
+covers both shipped locales.
+
+**Rationale.**
+
+*Deterministic.* §5.2.4's argument, restated: a guarantee that depends on the
+inference quality of a 4-bit model running on an old phone is not a guarantee.
+Nothing in this layer consults a model, so the corpus passes whichever engine is
+registered — which is the strongest form of that requirement, not merely a test
+of it.
+
+*Alongside, never instead.* Replacing the answer with a canned notice teaches a
+person in distress that saying the wrong thing gets them shut out of the
+conversation. The message is stored and answered like any other.
+
+*The UI locale.* §10's Hebrew gap and #11 together mean a Hebrew-reading user gets
+a Hebrew UI and an English assistant. The person still writes in Hebrew, so the
+patterns that must catch them are Hebrew — following the model's language here
+would leave exactly the users #11 exists for uncovered. The locale is read from
+the widget tree, the only place it is actually known.
+
+*Negative cases carry as much weight as positive ones.* "Work is killing me" and
+"I could die of embarrassment" must not fire. A layer that goes off on every hard
+day is one people learn to scroll past within a week — at which point it looks
+like care while functioning as noise, which is worse than absent.
+
+**Rejected alternatives.**
+
+- *Ask the model to classify the message* — better recall, and unusable here for
+  the reason above. It also puts the distressed message through a second
+  generation before the user sees anything.
+- *Patterns in Dart source* — no asset loading, no parse failures. Rejected:
+  §5.2.4 requires a localisable list, and tuning it would then mean a rebuild.
+- *Fail closed when a locale has no pattern file* — safer-sounding. Rejected: the
+  notice is supplementary, the model still answers, and taking the chat down over
+  a missing list helps nobody. Both shipped locales are covered by the corpus, so
+  this is a fallback for a language nobody has written patterns for yet, not an
+  accepted state.
+
+**Consequence.** Adding a language means an asset file, a corpus entry and an
+entry in `safetyLocales` — no code change. Widget tests substitute the pattern
+list rather than loading it: `rootBundle` caches the `Future` it returns, and a
+cached asset future does not resolve again inside a later test's `fake_async`
+zone, so the first test in a file would load it and every test after would hang
+waiting on it. The real assets are parsed and checked in their own test files.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

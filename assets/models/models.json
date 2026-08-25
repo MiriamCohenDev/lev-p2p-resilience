@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "The model registry (technical-spec §5.3). This file is the registry — the",
+    "code that reads it holds no per-model knowledge, so adding a Hebrew model",
+    "or a desktop-tier model is an entry here plus a GGUF file, with no change",
+    "under features/chat. Phase 3.3 verifies that claim.",
+    "",
+    "assetPath and sha256 are not read in Phase 2: the chat runs against",
+    "FakeLlmService and no GGUF is bundled yet. Phase 3.1 supplies the real file",
+    "and its digest, and checks the digest before load (§7.5).",
+    "",
+    "contextTokens and replyTokenReserve ARE read in Phase 2 — they are the",
+    "context budget PromptBuilder enforces (§5.2.3)."
+  ],
+  "models": [
+    {
+      "id": "qwen-en-q4",
+      "family": "qwen",
+      "assetPath": "assets/models/qwen-en-q4.gguf",
+      "sha256": "",
+      "language": "en",
+      "minRamMb": 3072,
+      "contextTokens": 4096,
+      "replyTokenReserve": 512,
+      "stopTokens": ["<|im_end|>", "<|endoftext|>"],
+      "quantization": "Q4_K_M"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# Build-time configuration for drift's code generator.
+#
+# `AppDatabase.options` already sets `storeDateTimeAsText: true` at runtime, and
+# that is what governs the app. This file tells the *generator* the same thing,
+# because two things read the build-time option instead: generated query code,
+# and `drift_dev schema dump`. Without it the dump under `drift_schemas/` records
+# `store_date_time_values_as_text: false` while the app stores text — a schema
+# snapshot that disagrees with the schema, which is worse than no snapshot when a
+# Phase 4 migration test is written against it.
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          store_date_time_values_as_text: true

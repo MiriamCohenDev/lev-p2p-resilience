@@ -1,0 +1,44 @@
+{
+  "$comment": [
+    "The deterministic safety layer (technical-spec §5.2.4). Evaluated on the",
+    "user's raw message BEFORE it reaches the model, and matched by plain Dart —",
+    "not by the model. §5.2.4's rationale: a guarantee that depends on the",
+    "inference quality of a 4-bit model running on an old phone is not a",
+    "guarantee.",
+    "",
+    "On a match, `supportMessage` is shown ALONGSIDE the model's reply, never",
+    "instead of it. Replacing the answer with a canned notice would tell someone",
+    "in distress that saying the wrong thing gets them shut out of the",
+    "conversation.",
+    "",
+    "Patterns are case-insensitive regular expressions matched against the",
+    "message. They are deliberately narrow: this layer surfaces one fixed notice,",
+    "so a false positive is an interruption, not a catastrophe — but a layer that",
+    "fires on every mention of a hard day would be ignored within a week, which",
+    "is the failure that matters. Negative cases live in the test corpus."
+  ],
+  "locale": "en",
+  "supportMessage": "It sounds like you are carrying something very heavy right now. LEV is not able to help with this part, and it shouldn't be the only thing you have. Please reach out to someone who can be with you in it — someone you trust, or your local emergency or crisis line. You deserve real support, not just an app.",
+  "patterns": [
+    {
+      "id": "suicidal-intent",
+      "pattern": "\\b(kill|killing)\\s+myself\\b|\\bend(ing)?\\s+my\\s+life\\b|\\btake\\s+my\\s+own\\s+life\\b|\\bcommit\\s+suicide\\b|\\bsuicidal\\b"
+    },
+    {
+      "id": "not-wanting-to-exist",
+      "pattern": "\\b(don'?t|do\\s+not)\\s+want\\s+to\\s+(live|be\\s+here|exist|wake\\s+up)\\b|\\bwant\\s+to\\s+die\\b|\\bbetter\\s+off\\s+(dead|without\\s+me)\\b|\\bno\\s+reason\\s+to\\s+(live|go\\s+on)\\b"
+    },
+    {
+      "id": "self-harm",
+      "pattern": "\\b(hurt|harm|cut|cutting)\\s+myself\\b|\\bself[-\\s]?harm\\b"
+    },
+    {
+      "id": "harm-to-others",
+      "pattern": "\\b(kill|hurt|harm)\\s+(him|her|them|someone|somebody|my\\s+\\w+)\\b"
+    },
+    {
+      "id": "abuse",
+      "pattern": "\\b(hits?|hitting|beats?|beating|abus(es?|ing|ive))\\s+me\\b|\\bafraid\\s+(of|for)\\s+my\\s+(life|safety)\\b"
+    }
+  ]
+}

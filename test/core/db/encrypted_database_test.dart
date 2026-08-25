@@ -64,7 +64,7 @@ void main() {
 
       expect(rows, hasLength(1));
       expect(rows.single.body, contains(storageProbeCanary));
-      expect(rows.single.fromUser, isTrue);
+      expect(rows.single.role, 'user');
       // drift stores a DateTime as unix seconds and hands it back in local
       // time, so compare the instant rather than the representation.
       expect(

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/chat/presentation/conversation_list_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/mutual_aid/presentation/tasks_screen.dart';
 import 'app_routes.dart';
@@ -18,13 +19,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.home,
         name: AppRoutes.homeName,
         builder: (context, state) => const HomeScreen(),
-        // Nested so Chat and Tasks are pushed onto Home, giving each screen a
-        // working back affordance instead of replacing the stack.
+        // Nested so each screen is pushed rather than replacing the stack,
+        // giving every one a working back affordance.
         routes: [
           GoRoute(
-            path: AppRoutes.chatSegment,
-            name: AppRoutes.chatName,
-            builder: (context, state) => const ChatScreen(),
+            path: AppRoutes.conversationsSegment,
+            name: AppRoutes.conversationsName,
+            builder: (context, state) => const ConversationListScreen(),
+            routes: [
+              GoRoute(
+                path: AppRoutes.chatSegment,
+                name: AppRoutes.chatName,
+                builder: (context, state) => ChatScreen(
+                  conversationId:
+                      state.pathParameters[AppRoutes.conversationIdParam]!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: AppRoutes.tasksSegment,

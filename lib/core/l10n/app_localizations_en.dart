@@ -26,10 +26,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeOpenTasks => 'Help requests';
 
   @override
+  String get conversationsTitle => 'Conversations';
+
+  @override
+  String get conversationsEmpty =>
+      'No conversations yet. Start one whenever you are ready.';
+
+  @override
+  String get conversationsNew => 'New conversation';
+
+  @override
+  String get conversationUntitled => 'Untitled conversation';
+
+  @override
+  String get conversationDelete => 'Delete';
+
+  @override
+  String get conversationDeleteTitle => 'Delete this conversation?';
+
+  @override
+  String get conversationDeleteBody =>
+      'Its messages will be erased from this device. This cannot be undone.';
+
+  @override
   String get chatTitle => 'Conversation';
 
   @override
-  String get chatComingSoon => 'The supportive chat is not built yet.';
+  String get chatInputHint => 'Write a message';
+
+  @override
+  String get chatSend => 'Send';
+
+  @override
+  String get chatStop => 'Stop';
+
+  @override
+  String get chatTyping => 'LEV is writing…';
+
+  @override
+  String get chatPreparing => 'Preparing the conversation…';
+
+  @override
+  String get chatEmpty => 'Say whatever is on your mind.';
+
+  @override
+  String get chatFailed => 'The reply could not be finished.';
+
+  @override
+  String get chatLoadFailed => 'This conversation could not be opened.';
+
+  @override
+  String get retry => 'Try again';
+
+  @override
+  String get dismiss => 'Dismiss';
+
+  @override
+  String get cancel => 'Cancel';
 
   @override
   String get tasksTitle => 'Help requests';

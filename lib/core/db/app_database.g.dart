@@ -49,8 +49,77 @@ class $ConversationsTable extends Conversations
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _summaryMeta = const VerificationMeta(
+    'summary',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, title, createdAt, updatedAt];
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+    'summary',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _summaryUpToMessageIdMeta =
+      const VerificationMeta('summaryUpToMessageId');
+  @override
+  late final GeneratedColumn<String> summaryUpToMessageId =
+      GeneratedColumn<String>(
+        'summary_up_to_message_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _systemPromptVersionMeta =
+      const VerificationMeta('systemPromptVersion');
+  @override
+  late final GeneratedColumn<String> systemPromptVersion =
+      GeneratedColumn<String>(
+        'system_prompt_version',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _modelIdMeta = const VerificationMeta(
+    'modelId',
+  );
+  @override
+  late final GeneratedColumn<String> modelId = GeneratedColumn<String>(
+    'model_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    summary,
+    summaryUpToMessageId,
+    systemPromptVersion,
+    modelId,
+    isDeleted,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -92,6 +161,42 @@ class $ConversationsTable extends Conversations
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('summary')) {
+      context.handle(
+        _summaryMeta,
+        summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
+      );
+    }
+    if (data.containsKey('summary_up_to_message_id')) {
+      context.handle(
+        _summaryUpToMessageIdMeta,
+        summaryUpToMessageId.isAcceptableOrUnknown(
+          data['summary_up_to_message_id']!,
+          _summaryUpToMessageIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('system_prompt_version')) {
+      context.handle(
+        _systemPromptVersionMeta,
+        systemPromptVersion.isAcceptableOrUnknown(
+          data['system_prompt_version']!,
+          _systemPromptVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('model_id')) {
+      context.handle(
+        _modelIdMeta,
+        modelId.isAcceptableOrUnknown(data['model_id']!, _modelIdMeta),
+      );
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -117,6 +222,26 @@ class $ConversationsTable extends Conversations
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      summary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary'],
+      ),
+      summaryUpToMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary_up_to_message_id'],
+      ),
+      systemPromptVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}system_prompt_version'],
+      ),
+      modelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model_id'],
+      ),
+      isDeleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted'],
+      )!,
     );
   }
 
@@ -134,11 +259,32 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
   /// Bumped whenever a message is appended, so the conversation list can be
   /// ordered by recent activity rather than by creation.
   final DateTime updatedAt;
+
+  /// The rolling summary of turns folded out of the context window (§5.2.3),
+  /// and the last message it accounts for.
+  ///
+  /// Model-derived but full of user content, so it lives here inside the
+  /// encrypted database like everything else (§7.2) — never in a cache file.
+  final String? summary;
+  final String? summaryUpToMessageId;
+
+  /// The prompt version and model this conversation was held under (§5.2.1,
+  /// §5.3). Nullable: conversations created before the prompt layer existed
+  /// have neither, and inventing a value would misreport which prompt produced
+  /// their replies.
+  final String? systemPromptVersion;
+  final String? modelId;
+  final bool isDeleted;
   const ConversationRow({
     required this.id,
     required this.title,
     required this.createdAt,
     required this.updatedAt,
+    this.summary,
+    this.summaryUpToMessageId,
+    this.systemPromptVersion,
+    this.modelId,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -147,6 +293,19 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     map['title'] = Variable<String>(title);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || summary != null) {
+      map['summary'] = Variable<String>(summary);
+    }
+    if (!nullToAbsent || summaryUpToMessageId != null) {
+      map['summary_up_to_message_id'] = Variable<String>(summaryUpToMessageId);
+    }
+    if (!nullToAbsent || systemPromptVersion != null) {
+      map['system_prompt_version'] = Variable<String>(systemPromptVersion);
+    }
+    if (!nullToAbsent || modelId != null) {
+      map['model_id'] = Variable<String>(modelId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -156,6 +315,19 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       title: Value(title),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      summary: summary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summary),
+      summaryUpToMessageId: summaryUpToMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summaryUpToMessageId),
+      systemPromptVersion: systemPromptVersion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(systemPromptVersion),
+      modelId: modelId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(modelId),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -169,6 +341,15 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       title: serializer.fromJson<String>(json['title']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      summary: serializer.fromJson<String?>(json['summary']),
+      summaryUpToMessageId: serializer.fromJson<String?>(
+        json['summaryUpToMessageId'],
+      ),
+      systemPromptVersion: serializer.fromJson<String?>(
+        json['systemPromptVersion'],
+      ),
+      modelId: serializer.fromJson<String?>(json['modelId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -179,6 +360,11 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       'title': serializer.toJson<String>(title),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'summary': serializer.toJson<String?>(summary),
+      'summaryUpToMessageId': serializer.toJson<String?>(summaryUpToMessageId),
+      'systemPromptVersion': serializer.toJson<String?>(systemPromptVersion),
+      'modelId': serializer.toJson<String?>(modelId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -187,11 +373,25 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     String? title,
     DateTime? createdAt,
     DateTime? updatedAt,
+    Value<String?> summary = const Value.absent(),
+    Value<String?> summaryUpToMessageId = const Value.absent(),
+    Value<String?> systemPromptVersion = const Value.absent(),
+    Value<String?> modelId = const Value.absent(),
+    bool? isDeleted,
   }) => ConversationRow(
     id: id ?? this.id,
     title: title ?? this.title,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    summary: summary.present ? summary.value : this.summary,
+    summaryUpToMessageId: summaryUpToMessageId.present
+        ? summaryUpToMessageId.value
+        : this.summaryUpToMessageId,
+    systemPromptVersion: systemPromptVersion.present
+        ? systemPromptVersion.value
+        : this.systemPromptVersion,
+    modelId: modelId.present ? modelId.value : this.modelId,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   ConversationRow copyWithCompanion(ConversationsCompanion data) {
     return ConversationRow(
@@ -199,6 +399,15 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       title: data.title.present ? data.title.value : this.title,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      summary: data.summary.present ? data.summary.value : this.summary,
+      summaryUpToMessageId: data.summaryUpToMessageId.present
+          ? data.summaryUpToMessageId.value
+          : this.summaryUpToMessageId,
+      systemPromptVersion: data.systemPromptVersion.present
+          ? data.systemPromptVersion.value
+          : this.systemPromptVersion,
+      modelId: data.modelId.present ? data.modelId.value : this.modelId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -208,13 +417,28 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('summary: $summary, ')
+          ..write('summaryUpToMessageId: $summaryUpToMessageId, ')
+          ..write('systemPromptVersion: $systemPromptVersion, ')
+          ..write('modelId: $modelId, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    createdAt,
+    updatedAt,
+    summary,
+    summaryUpToMessageId,
+    systemPromptVersion,
+    modelId,
+    isDeleted,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -222,7 +446,12 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           other.id == this.id &&
           other.title == this.title &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.summary == this.summary &&
+          other.summaryUpToMessageId == this.summaryUpToMessageId &&
+          other.systemPromptVersion == this.systemPromptVersion &&
+          other.modelId == this.modelId &&
+          other.isDeleted == this.isDeleted);
 }
 
 class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
@@ -230,12 +459,22 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
   final Value<String> title;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String?> summary;
+  final Value<String?> summaryUpToMessageId;
+  final Value<String?> systemPromptVersion;
+  final Value<String?> modelId;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const ConversationsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.summaryUpToMessageId = const Value.absent(),
+    this.systemPromptVersion = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationsCompanion.insert({
@@ -243,6 +482,11 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
     required String title,
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.summary = const Value.absent(),
+    this.summaryUpToMessageId = const Value.absent(),
+    this.systemPromptVersion = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -253,6 +497,11 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
     Expression<String>? title,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? summary,
+    Expression<String>? summaryUpToMessageId,
+    Expression<String>? systemPromptVersion,
+    Expression<String>? modelId,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -260,6 +509,13 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
       if (title != null) 'title': title,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (summary != null) 'summary': summary,
+      if (summaryUpToMessageId != null)
+        'summary_up_to_message_id': summaryUpToMessageId,
+      if (systemPromptVersion != null)
+        'system_prompt_version': systemPromptVersion,
+      if (modelId != null) 'model_id': modelId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -269,6 +525,11 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
     Value<String>? title,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<String?>? summary,
+    Value<String?>? summaryUpToMessageId,
+    Value<String?>? systemPromptVersion,
+    Value<String?>? modelId,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return ConversationsCompanion(
@@ -276,6 +537,11 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
       title: title ?? this.title,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      summary: summary ?? this.summary,
+      summaryUpToMessageId: summaryUpToMessageId ?? this.summaryUpToMessageId,
+      systemPromptVersion: systemPromptVersion ?? this.systemPromptVersion,
+      modelId: modelId ?? this.modelId,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -295,6 +561,25 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
+    if (summaryUpToMessageId.present) {
+      map['summary_up_to_message_id'] = Variable<String>(
+        summaryUpToMessageId.value,
+      );
+    }
+    if (systemPromptVersion.present) {
+      map['system_prompt_version'] = Variable<String>(
+        systemPromptVersion.value,
+      );
+    }
+    if (modelId.present) {
+      map['model_id'] = Variable<String>(modelId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -308,6 +593,11 @@ class ConversationsCompanion extends UpdateCompanion<ConversationRow> {
           ..write('title: $title, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('summary: $summary, ')
+          ..write('summaryUpToMessageId: $summaryUpToMessageId, ')
+          ..write('systemPromptVersion: $systemPromptVersion, ')
+          ..write('modelId: $modelId, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -352,19 +642,14 @@ class $MessagesTable extends Messages
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _fromUserMeta = const VerificationMeta(
-    'fromUser',
-  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
   @override
-  late final GeneratedColumn<bool> fromUser = GeneratedColumn<bool>(
-    'from_user',
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
     aliasedName,
     false,
-    type: DriftSqlType.bool,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("from_user" IN (0, 1))',
-    ),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -382,7 +667,7 @@ class $MessagesTable extends Messages
     id,
     conversationId,
     body,
-    fromUser,
+    role,
     createdAt,
   ];
   @override
@@ -421,13 +706,13 @@ class $MessagesTable extends Messages
     } else if (isInserting) {
       context.missing(_bodyMeta);
     }
-    if (data.containsKey('from_user')) {
+    if (data.containsKey('role')) {
       context.handle(
-        _fromUserMeta,
-        fromUser.isAcceptableOrUnknown(data['from_user']!, _fromUserMeta),
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
       );
     } else if (isInserting) {
-      context.missing(_fromUserMeta);
+      context.missing(_roleMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -458,9 +743,9 @@ class $MessagesTable extends Messages
         DriftSqlType.string,
         data['${effectivePrefix}text'],
       )!,
-      fromUser: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}from_user'],
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
       )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -486,13 +771,22 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   /// disk. The Dart getter cannot be `text`: that is drift's own column-builder
   /// method on [Table]. The domain entity restores the spec's name.
   final String body;
-  final bool fromUser;
+
+  /// `user` | `assistant` | `system`, stored as text (§6.1).
+  ///
+  /// Deliberately **not** a boolean: the chat template (§5.2.2) maps roles to
+  /// model-specific markers and a boolean cannot express the system role. Kept
+  /// as a plain text column rather than a drift enum converter so the stored
+  /// vocabulary is owned by `MessageRole.wireName` in the domain, where the
+  /// parse failure can be meaningful. Validated on the way in and out by
+  /// `DriftChatRepository`.
+  final String role;
   final DateTime createdAt;
   const MessageRow({
     required this.id,
     required this.conversationId,
     required this.body,
-    required this.fromUser,
+    required this.role,
     required this.createdAt,
   });
   @override
@@ -501,7 +795,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     map['id'] = Variable<String>(id);
     map['conversation_id'] = Variable<String>(conversationId);
     map['text'] = Variable<String>(body);
-    map['from_user'] = Variable<bool>(fromUser);
+    map['role'] = Variable<String>(role);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -511,7 +805,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       id: Value(id),
       conversationId: Value(conversationId),
       body: Value(body),
-      fromUser: Value(fromUser),
+      role: Value(role),
       createdAt: Value(createdAt),
     );
   }
@@ -525,7 +819,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       id: serializer.fromJson<String>(json['id']),
       conversationId: serializer.fromJson<String>(json['conversationId']),
       body: serializer.fromJson<String>(json['body']),
-      fromUser: serializer.fromJson<bool>(json['fromUser']),
+      role: serializer.fromJson<String>(json['role']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -536,7 +830,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       'id': serializer.toJson<String>(id),
       'conversationId': serializer.toJson<String>(conversationId),
       'body': serializer.toJson<String>(body),
-      'fromUser': serializer.toJson<bool>(fromUser),
+      'role': serializer.toJson<String>(role),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -545,13 +839,13 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     String? id,
     String? conversationId,
     String? body,
-    bool? fromUser,
+    String? role,
     DateTime? createdAt,
   }) => MessageRow(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
     body: body ?? this.body,
-    fromUser: fromUser ?? this.fromUser,
+    role: role ?? this.role,
     createdAt: createdAt ?? this.createdAt,
   );
   MessageRow copyWithCompanion(MessagesCompanion data) {
@@ -561,7 +855,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ? data.conversationId.value
           : this.conversationId,
       body: data.body.present ? data.body.value : this.body,
-      fromUser: data.fromUser.present ? data.fromUser.value : this.fromUser,
+      role: data.role.present ? data.role.value : this.role,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -572,15 +866,14 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('id: $id, ')
           ..write('conversationId: $conversationId, ')
           ..write('body: $body, ')
-          ..write('fromUser: $fromUser, ')
+          ..write('role: $role, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, conversationId, body, fromUser, createdAt);
+  int get hashCode => Object.hash(id, conversationId, body, role, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -588,7 +881,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.id == this.id &&
           other.conversationId == this.conversationId &&
           other.body == this.body &&
-          other.fromUser == this.fromUser &&
+          other.role == this.role &&
           other.createdAt == this.createdAt);
 }
 
@@ -596,14 +889,14 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
   final Value<String> id;
   final Value<String> conversationId;
   final Value<String> body;
-  final Value<bool> fromUser;
+  final Value<String> role;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
     this.conversationId = const Value.absent(),
     this.body = const Value.absent(),
-    this.fromUser = const Value.absent(),
+    this.role = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -611,19 +904,19 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     required String id,
     required String conversationId,
     required String body,
-    required bool fromUser,
+    required String role,
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
        body = Value(body),
-       fromUser = Value(fromUser),
+       role = Value(role),
        createdAt = Value(createdAt);
   static Insertable<MessageRow> custom({
     Expression<String>? id,
     Expression<String>? conversationId,
     Expression<String>? body,
-    Expression<bool>? fromUser,
+    Expression<String>? role,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -631,7 +924,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       if (id != null) 'id': id,
       if (conversationId != null) 'conversation_id': conversationId,
       if (body != null) 'text': body,
-      if (fromUser != null) 'from_user': fromUser,
+      if (role != null) 'role': role,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -641,7 +934,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     Value<String>? id,
     Value<String>? conversationId,
     Value<String>? body,
-    Value<bool>? fromUser,
+    Value<String>? role,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -649,7 +942,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       id: id ?? this.id,
       conversationId: conversationId ?? this.conversationId,
       body: body ?? this.body,
-      fromUser: fromUser ?? this.fromUser,
+      role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -667,8 +960,8 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     if (body.present) {
       map['text'] = Variable<String>(body.value);
     }
-    if (fromUser.present) {
-      map['from_user'] = Variable<bool>(fromUser.value);
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -685,7 +978,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
           ..write('id: $id, ')
           ..write('conversationId: $conversationId, ')
           ..write('body: $body, ')
-          ..write('fromUser: $fromUser, ')
+          ..write('role: $role, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -698,12 +991,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ConversationsTable conversations = $ConversationsTable(this);
   late final $MessagesTable messages = $MessagesTable(this);
+  late final Index messagesConversationCreated = Index(
+    'messages_conversation_created',
+    'CREATE INDEX messages_conversation_created ON messages (conversation_id, created_at)',
+  );
   late final ChatDao chatDao = ChatDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [conversations, messages];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    conversations,
+    messages,
+    messagesConversationCreated,
+  ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
     WritePropagation(
@@ -714,6 +1015,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       result: [TableUpdate('messages', kind: UpdateKind.delete)],
     ),
   ]);
+  @override
+  DriftDatabaseOptions get options =>
+      const DriftDatabaseOptions(storeDateTimeAsText: true);
 }
 
 typedef $$ConversationsTableCreateCompanionBuilder =
@@ -722,6 +1026,11 @@ typedef $$ConversationsTableCreateCompanionBuilder =
       required String title,
       required DateTime createdAt,
       required DateTime updatedAt,
+      Value<String?> summary,
+      Value<String?> summaryUpToMessageId,
+      Value<String?> systemPromptVersion,
+      Value<String?> modelId,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$ConversationsTableUpdateCompanionBuilder =
@@ -730,6 +1039,11 @@ typedef $$ConversationsTableUpdateCompanionBuilder =
       Value<String> title,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String?> summary,
+      Value<String?> summaryUpToMessageId,
+      Value<String?> systemPromptVersion,
+      Value<String?> modelId,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -790,6 +1104,31 @@ class $$ConversationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get summaryUpToMessageId => $composableBuilder(
+    column: $table.summaryUpToMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get systemPromptVersion => $composableBuilder(
+    column: $table.systemPromptVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> messagesRefs(
     Expression<bool> Function($$MessagesTableFilterComposer f) f,
   ) {
@@ -844,6 +1183,31 @@ class $$ConversationsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get summaryUpToMessageId => $composableBuilder(
+    column: $table.summaryUpToMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get systemPromptVersion => $composableBuilder(
+    column: $table.systemPromptVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ConversationsTableAnnotationComposer
@@ -866,6 +1230,25 @@ class $$ConversationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<String> get summaryUpToMessageId => $composableBuilder(
+    column: $table.summaryUpToMessageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get systemPromptVersion => $composableBuilder(
+    column: $table.systemPromptVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get modelId =>
+      $composableBuilder(column: $table.modelId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
   Expression<T> messagesRefs<T extends Object>(
     Expression<T> Function($$MessagesTableAnnotationComposer a) f,
@@ -925,12 +1308,22 @@ class $$ConversationsTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<String?> summaryUpToMessageId = const Value.absent(),
+                Value<String?> systemPromptVersion = const Value.absent(),
+                Value<String?> modelId = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationsCompanion(
                 id: id,
                 title: title,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                summary: summary,
+                summaryUpToMessageId: summaryUpToMessageId,
+                systemPromptVersion: systemPromptVersion,
+                modelId: modelId,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -939,12 +1332,22 @@ class $$ConversationsTableTableManager
                 required String title,
                 required DateTime createdAt,
                 required DateTime updatedAt,
+                Value<String?> summary = const Value.absent(),
+                Value<String?> summaryUpToMessageId = const Value.absent(),
+                Value<String?> systemPromptVersion = const Value.absent(),
+                Value<String?> modelId = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationsCompanion.insert(
                 id: id,
                 title: title,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                summary: summary,
+                summaryUpToMessageId: summaryUpToMessageId,
+                systemPromptVersion: systemPromptVersion,
+                modelId: modelId,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -1009,7 +1412,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required String id,
   required String conversationId,
   required String body,
-  required bool fromUser,
+  required String role,
   required DateTime createdAt,
   Value<int> rowid,
 });
@@ -1017,7 +1420,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<String> id,
   Value<String> conversationId,
   Value<String> body,
-  Value<bool> fromUser,
+  Value<String> role,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -1064,8 +1467,8 @@ class $$MessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get fromUser => $composableBuilder(
-    column: $table.fromUser,
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1117,8 +1520,8 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get fromUser => $composableBuilder(
-    column: $table.fromUser,
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1166,8 +1569,8 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<String> get body =>
       $composableBuilder(column: $table.body, builder: (column) => column);
 
-  GeneratedColumn<bool> get fromUser =>
-      $composableBuilder(column: $table.fromUser, builder: (column) => column);
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1227,14 +1630,14 @@ class $$MessagesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> conversationId = const Value.absent(),
                 Value<String> body = const Value.absent(),
-                Value<bool> fromUser = const Value.absent(),
+                Value<String> role = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion(
                 id: id,
                 conversationId: conversationId,
                 body: body,
-                fromUser: fromUser,
+                role: role,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -1243,14 +1646,14 @@ class $$MessagesTableTableManager
                 required String id,
                 required String conversationId,
                 required String body,
-                required bool fromUser,
+                required String role,
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion.insert(
                 id: id,
                 conversationId: conversationId,
                 body: body,
-                fromUser: fromUser,
+                role: role,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

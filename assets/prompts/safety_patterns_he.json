@@ -1,0 +1,37 @@
+{
+  "$comment": [
+    "The Hebrew half of the safety layer (technical-spec §5.2.4). See",
+    "safety_patterns_en.json for what this file is and how it is matched.",
+    "",
+    "This is a localisation, not a translation of the regular expressions: the",
+    "same intent is written differently in Hebrew, and word-for-word conversion",
+    "would miss the common phrasings. Note the UI is bilingual even while the",
+    "model is English-only (technical-decisions #11) — a Hebrew-writing user must",
+    "still be caught by this layer, which is precisely why it does not depend on",
+    "the model."
+  ],
+  "locale": "he",
+  "supportMessage": "נשמע שאת/ה נושא/ת עכשיו משהו כבד מאוד. לב לא יכולה לעזור בחלק הזה, וגם לא נכון שהיא תהיה הדבר היחיד שיש לך. אנא פנה/י למישהו שיכול להיות איתך בזה — מישהו שאת/ה סומך/ת עליו, או לקו החירום או הסיוע המקומי. מגיעה לך תמיכה אמיתית, לא רק אפליקציה.",
+  "patterns": [
+    {
+      "id": "suicidal-intent",
+      "pattern": "לשים\\s+סוף\\s+לחיים|לסיים\\s+את\\s+החיים|להתאבד|אתאבד|התאבדות|אובדנ(י|ות)"
+    },
+    {
+      "id": "not-wanting-to-exist",
+      "pattern": "לא\\s+רוצה\\s+(לחיות|להיות\\s+כאן|להתעורר)|רוצה\\s+למות|עדיף\\s+ש(אמות|לא\\s+אהיה)|אין\\s+לי\\s+סיבה\\s+לחיות|נמאס\\s+לי\\s+מהחיים"
+    },
+    {
+      "id": "self-harm",
+      "pattern": "לפגוע\\s+בעצמי|פגיעה\\s+עצמית|לחתוך\\s+את\\s+עצמי|חותכ(ת|)\\s+את\\s+עצמי"
+    },
+    {
+      "id": "harm-to-others",
+      "pattern": "לפגוע\\s+ב(ו|ה|הם|מישהו)|להרוג\\s+(אותו|אותה|אותם|מישהו)"
+    },
+    {
+      "id": "abuse",
+      "pattern": "מכה\\s+אותי|מרביץ\\s+לי|מתעלל\\s+ב(י|ה?)|מפחד(ת|)\\s+על\\s+החיים\\s+שלי"
+    }
+  ]
+}

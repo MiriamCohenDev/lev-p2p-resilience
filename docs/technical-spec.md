@@ -371,7 +371,7 @@ In dependency order when picked up: **(a)** iOS support (revisit native bindings
 `flutter`, `flutter_riverpod` / `riverpod`, `drift` + `sqlcipher_flutter_libs`, a llama.cpp Dart/FFI binding (`fllama` / `llama_cpp_dart`), `flutter_secure_storage`, an Argon2 implementation, `uuid`, `flutter_test`, `mocktail`.
 
 ### Appendix B — Decisions log
-A running record of every decision, its rationale, and rejected alternatives is maintained in the LEV project at `claude/lev-technical-decisions.md`.
+A running record of every decision, its rationale, and rejected alternatives is maintained at [`docs/technical-decisions.md`](technical-decisions.md).
 
 ### Appendix C — Sources
 - IEEE 1016-based SDD template — https://github.com/jam01/SDD-Template
