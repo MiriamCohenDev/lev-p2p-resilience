@@ -3,42 +3,142 @@
 
   "appTitle": "LEV",
   "@appTitle": {
-    "description": "The application name, shown in the task switcher and app bars"
+    "description": "The application name, shown in the task switcher, the window title and the Home app bar. Latin in both locales — it is the wordmark, not a translated noun"
   },
 
-  "homeTagline": "A quiet space for support and mutual aid.",
-  "@homeTagline": {
-    "description": "One-line summary of LEV's purpose, shown on the Home screen"
+  "navHome": "Home",
+  "@navHome": {
+    "description": "Bottom navigation / rail destination: the Home screen"
   },
 
-  "homeDescription": "LEV runs entirely on your device. Talk things through with a local assistant, or lend and receive a hand nearby. No account, no server, nothing leaves this device.",
-  "@homeDescription": {
-    "description": "Short paragraph on the Home screen describing what LEV is"
+  "navChat": "Chat",
+  "@navChat": {
+    "description": "Bottom navigation / rail destination: the supportive conversation"
   },
 
-  "homeOpenChat": "Start a conversation",
-  "@homeOpenChat": {
-    "description": "Home screen button that navigates to the conversation list"
+  "navAid": "Help",
+  "@navAid": {
+    "description": "Bottom navigation / rail destination: mutual aid"
   },
 
-  "homeOpenTasks": "Help requests",
-  "@homeOpenTasks": {
-    "description": "Home screen button that navigates to the Tasks screen"
+  "welcomeTagline": "A quiet place to talk, and a small net of people nearby.",
+  "@welcomeTagline": {
+    "description": "One-line description of what LEV is, on the first-run screen"
+  },
+
+  "welcomePrivacy": "Everything stays on your device. No account, no sign-up, and no internet connection.",
+  "@welcomePrivacy": {
+    "description": "The privacy promise on the first-run screen. Shown in a card, before any decision is asked for"
+  },
+
+  "welcomeLockTitle": "Lock with a code",
+  "@welcomeLockTitle": {
+    "description": "Title of the optional PIN-lock offer on the first-run screen"
+  },
+
+  "welcomeLockWarning": "If you forget the code there is no way to recover it, and the data will be lost. There is no server that can help.",
+  "@welcomeLockWarning": {
+    "description": "The warning that goes with the PIN-lock offer. Deliberately in the body of the card, at the same size as the rest of the text, and before the decision — not in small print"
+  },
+
+  "lockUnavailable": "Locking with a code is not available in this version yet.",
+  "@lockUnavailable": {
+    "description": "Why the PIN-lock switch is disabled. PIN mode (an Argon2-derived KEK) is not implemented, and a disabled control with no explanation is a broken screen"
+  },
+
+  "welcomeStart": "Get started",
+  "@welcomeStart": {
+    "description": "The single action on the first-run screen. There is no 'skip' — one screen, one button"
+  },
+
+  "homeGreetingMorning": "Good morning",
+  "@homeGreetingMorning": {
+    "description": "Home greeting before noon. Chosen from the device clock — this is all the application 'knows' about the user, and no personalisation here needs any data"
+  },
+
+  "homeGreetingAfternoon": "Good afternoon",
+  "@homeGreetingAfternoon": {
+    "description": "Home greeting between noon and evening"
+  },
+
+  "homeGreetingEvening": "Good evening",
+  "@homeGreetingEvening": {
+    "description": "Home greeting from the evening onwards, including overnight"
+  },
+
+  "homePromptMorning": "How are you feeling this morning?",
+  "@homePromptMorning": {
+    "description": "The secondary line under the Home greeting, before noon"
+  },
+
+  "homePromptAfternoon": "How are you feeling today?",
+  "@homePromptAfternoon": {
+    "description": "The secondary line under the Home greeting, in the afternoon"
+  },
+
+  "homePromptEvening": "How are you feeling this evening?",
+  "@homePromptEvening": {
+    "description": "The secondary line under the Home greeting, in the evening"
+  },
+
+  "homeStartChat": "Start a conversation",
+  "@homeStartChat": {
+    "description": "The only filled button on the Home screen. Creates a conversation and opens it"
+  },
+
+  "homeResumeLabel": "Pick up where you left off",
+  "@homeResumeLabel": {
+    "description": "Section label above the card for the most recent conversation"
   },
 
   "conversationsTitle": "Conversations",
   "@conversationsTitle": {
-    "description": "App bar title of the conversation list screen"
-  },
-
-  "conversationsEmpty": "No conversations yet. Start one whenever you are ready.",
-  "@conversationsEmpty": {
-    "description": "Shown on the conversation list when nothing has been saved yet"
+    "description": "Header of the conversation list, in the drawer and in the desktop column"
   },
 
   "conversationsNew": "New conversation",
   "@conversationsNew": {
-    "description": "Button that creates a conversation and opens it"
+    "description": "Button at the top of the conversation list that creates one and opens it"
+  },
+
+  "conversationsSearchHint": "Search conversations",
+  "@conversationsSearchHint": {
+    "description": "Placeholder in the conversation-list search field"
+  },
+
+  "conversationsEmptyTitle": "We haven't talked yet",
+  "@conversationsEmptyTitle": {
+    "description": "Title of the empty state shown when no conversation has been saved, and inside an open conversation with no messages"
+  },
+
+  "conversationsEmptyBody": "What you write here is saved encrypted on your device alone, and never leaves it.",
+  "@conversationsEmptyBody": {
+    "description": "Body of the empty conversation state. The promise is repeated at exactly the moment the user is about to write the first thing — which is where the sentence is worth something"
+  },
+
+  "conversationsSearchEmptyTitle": "No conversation found",
+  "@conversationsSearchEmptyTitle": {
+    "description": "Shown when a search over the conversation list matches nothing. A filtered empty state explains; it gets no action, because there is nothing to do in it but change the search"
+  },
+
+  "conversationsSearchEmptyBody": "You can search for a word from inside the messages too, not only the title.",
+  "@conversationsSearchEmptyBody": {
+    "description": "Body of the empty search result"
+  },
+
+  "conversationGroupToday": "Today",
+  "@conversationGroupToday": {
+    "description": "Time heading in the conversation list. A supportive conversation is remembered by when it happened, not by its title"
+  },
+
+  "conversationGroupLastWeek": "Last 7 days",
+  "@conversationGroupLastWeek": {
+    "description": "Time heading in the conversation list"
+  },
+
+  "conversationGroupEarlier": "Earlier",
+  "@conversationGroupEarlier": {
+    "description": "Time heading in the conversation list, for everything older than a week"
   },
 
   "conversationUntitled": "Untitled conversation",
@@ -61,12 +161,31 @@
     "description": "Body of the delete-conversation confirmation dialog"
   },
 
+  "stamp": "{day} · {time}",
+  "@stamp": {
+    "description": "Joins a relative day and a clock time, as shown under a conversation card",
+    "placeholders": {
+      "day": { "type": "String", "example": "Yesterday" },
+      "time": { "type": "String", "example": "22:40" }
+    }
+  },
+
+  "dayToday": "Today",
+  "@dayToday": {
+    "description": "Relative day used in a timestamp"
+  },
+
+  "dayYesterday": "Yesterday",
+  "@dayYesterday": {
+    "description": "Relative day used in a timestamp"
+  },
+
   "chatTitle": "Conversation",
   "@chatTitle": {
     "description": "App bar title of the Chat screen when the conversation has no derived title"
   },
 
-  "chatInputHint": "Write a message",
+  "chatInputHint": "Write here…",
   "@chatInputHint": {
     "description": "Placeholder in the chat message field"
   },
@@ -78,32 +197,239 @@
 
   "chatStop": "Stop",
   "@chatStop": {
-    "description": "Button that stops a reply while it is being written"
+    "description": "Button that stops a reply while it is being written. It replaces Send rather than disappearing: a send button that does nothing is a frozen screen with a nicer coat of paint"
   },
 
-  "chatTyping": "LEV is writing…",
+  "chatTyping": "Writing a reply",
   "@chatTyping": {
-    "description": "Shown while the assistant's reply is streaming in"
+    "description": "Announced as a live region while the three dots are showing, so a blind user knows the model is writing"
   },
 
-  "chatPreparing": "Preparing the conversation…",
-  "@chatPreparing": {
-    "description": "Shown while the conversation is being prefilled, before it can be used"
+  "chatPreparingSession": "Preparing the conversation…",
+  "@chatPreparingSession": {
+    "description": "The banner shown while a saved conversation's session prefills. Short and expected, so it is a line that hides nothing — the old messages stay visible beneath it"
   },
 
-  "chatEmpty": "Say whatever is on your mind.",
-  "@chatEmpty": {
-    "description": "Shown in an open conversation that has no messages yet"
+  "chatPreparingModelTitle": "Preparing the model",
+  "@chatPreparingModelTitle": {
+    "description": "Full-screen state while the model is loaded and verified. Long and one-off, which is why it gets a whole screen rather than a line"
   },
 
-  "chatFailed": "The reply could not be finished.",
-  "@chatFailed": {
-    "description": "Shown when generation fails part-way; anything already written stays on screen"
+  "chatPreparingModelBody": "This happens once. After it, opening is immediate.",
+  "@chatPreparingModelBody": {
+    "description": "Body of the model preparation screen"
+  },
+
+  "chatPreparingModelOffline": "No internet connection",
+  "@chatPreparingModelOffline": {
+    "description": "A small line that appears exactly where any other application would be downloading something. It is a chance to prove the promise in real time"
+  },
+
+  "chatTruncatedTitle": "The reply was cut off",
+  "@chatTruncatedTitle": {
+    "description": "Shown inline when generation stopped part-way. Whatever already arrived stays on screen; this says the rest is not coming"
+  },
+
+  "chatTruncatedBody": "Something stopped it half-way. The conversation was saved, and you can try again.",
+  "@chatTruncatedBody": {
+    "description": "Body of the truncated-reply notice"
   },
 
   "chatLoadFailed": "This conversation could not be opened.",
   "@chatLoadFailed": {
     "description": "Shown when the conversation itself cannot be loaded"
+  },
+
+  "modelIntegrityTitle": "We could not load the model",
+  "@modelIntegrityTitle": {
+    "description": "The sha256 integrity check failed. Per the spec this must refuse to load rather than trying anyway, and this screen is the expression of that rule"
+  },
+
+  "modelIntegrityBody": "The model file is not valid, or has changed since it was installed. The copy between devices may have been interrupted.",
+  "@modelIntegrityBody": {
+    "description": "Body of the model-integrity failure"
+  },
+
+  "modelIntegrityAction": "Import the file again",
+  "@modelIntegrityAction": {
+    "description": "Action offered after a model-integrity failure"
+  },
+
+  "modelTooSmallTitle": "This device is small for the model",
+  "@modelTooSmallTitle": {
+    "description": "The min-spec gate refused. Phrased against the pairing, not against the user's device: an error that blames the device and walks away is a dead screen"
+  },
+
+  "modelTooSmallBody": "The chat needs free memory that is not here, and it would have stalled. You can try a smaller model if there is one on this device.",
+  "@modelTooSmallBody": {
+    "description": "Body of the below-spec device state"
+  },
+
+  "modelTooSmallAction": "Choose another model",
+  "@modelTooSmallAction": {
+    "description": "Action offered when the device is below the model's minimum spec"
+  },
+
+  "modelUnavailableTitle": "The chat could not be opened",
+  "@modelUnavailableTitle": {
+    "description": "Generic model failure: no weights installed, or a manifest that could not be read"
+  },
+
+  "modelUnavailableBody": "The language model is not available on this device. It is installed alongside the application, and without it the conversation cannot run.",
+  "@modelUnavailableBody": {
+    "description": "Body of the generic model failure"
+  },
+
+  "aidStillWorks": "Mutual aid keeps working as usual.",
+  "@aidStillWorks": {
+    "description": "The footnote that ends every chat error. Not consolation but an architectural fact: the two capabilities are fully independent, so one failing must never look like the application failing"
+  },
+
+  "aidTitle": "Help",
+  "@aidTitle": {
+    "description": "Title of the mutual-aid screen"
+  },
+
+  "aidComingSoonTitle": "Mutual aid is not built yet",
+  "@aidComingSoonTitle": {
+    "description": "Placeholder on the mutual-aid tab. Deliberately not phrased as 'no open requests' — that would be a lie: the feature does not exist, it is not empty"
+  },
+
+  "aidComingSoonBody": "When it is ready, help requests from nearby will appear here — and all of it will stay on the device.",
+  "@aidComingSoonBody": {
+    "description": "Body of the mutual-aid placeholder"
+  },
+
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title of the settings screen, and the tooltip of the control that opens it"
+  },
+
+  "settingsGroupGeneral": "General",
+  "@settingsGroupGeneral": {
+    "description": "Settings group heading"
+  },
+
+  "settingsLanguage": "Interface language",
+  "@settingsLanguage": {
+    "description": "Settings row: the UI language. Independent of the model's language, which is English in v1"
+  },
+
+  "settingsAppearance": "Appearance",
+  "@settingsAppearance": {
+    "description": "Settings row: light / dark / follow the device"
+  },
+
+  "settingsFollowDevice": "Follow the device",
+  "@settingsFollowDevice": {
+    "description": "The default value of both the language and the appearance rows. It matters in an evening application: someone whose device is dark at night should not have to go looking for a setting"
+  },
+
+  "settingsAppearanceLight": "Light",
+  "@settingsAppearanceLight": {
+    "description": "Appearance option"
+  },
+
+  "settingsAppearanceDark": "Dark",
+  "@settingsAppearanceDark": {
+    "description": "Appearance option"
+  },
+
+  "languageHebrew": "עברית",
+  "@languageHebrew": {
+    "description": "The Hebrew language, named in Hebrew in both locales — a language is listed in its own name so a speaker can find it"
+  },
+
+  "languageEnglish": "English",
+  "@languageEnglish": {
+    "description": "The English language, named in English in both locales"
+  },
+
+  "settingsGroupModel": "Language model",
+  "@settingsGroupModel": {
+    "description": "Settings group heading"
+  },
+
+  "settingsActiveModel": "Active model",
+  "@settingsActiveModel": {
+    "description": "Settings row naming the model that is running. The model is shown rather than hidden: this is not technical curiosity, it is what proves the product's central promise, and so it belongs on a screen the user sees"
+  },
+
+  "settingsModelValue": "{family} · {language}",
+  "@settingsModelValue": {
+    "description": "The active model's family and the language it speaks",
+    "placeholders": {
+      "family": { "type": "String", "example": "Qwen" },
+      "language": { "type": "String", "example": "English" }
+    }
+  },
+
+  "settingsModelOnDevice": "Runs on the device, with no network",
+  "@settingsModelOnDevice": {
+    "description": "Subtitle under the active model row, when its file size is not known"
+  },
+
+  "settingsModelOnDeviceWithSize": "{size} GB · runs on the device, with no network",
+  "@settingsModelOnDeviceWithSize": {
+    "description": "Subtitle under the active model row, including the installed file's size",
+    "placeholders": {
+      "size": { "type": "String", "example": "1.1" }
+    }
+  },
+
+  "settingsGroupPrivacy": "Privacy",
+  "@settingsGroupPrivacy": {
+    "description": "Settings group heading"
+  },
+
+  "settingsLock": "Lock with a code",
+  "@settingsLock": {
+    "description": "Settings row for the optional PIN. Disabled for now — see lockUnavailable"
+  },
+
+  "settingsDeleteAll": "Delete all data",
+  "@settingsDeleteAll": {
+    "description": "Settings row that erases everything. With no server this is the only way to start over, so it has to be easy to find — and behind an explicit confirmation"
+  },
+
+  "settingsGroupAbout": "About",
+  "@settingsGroupAbout": {
+    "description": "Settings group heading"
+  },
+
+  "settingsVersion": "Version",
+  "@settingsVersion": {
+    "description": "Settings row showing the application version"
+  },
+
+  "deleteAllTitle": "Delete all data?",
+  "@deleteAllTitle": {
+    "description": "Title of the only destructive confirmation in the product, and the only place its red appears"
+  },
+
+  "deleteAllBody": "Every conversation and request will be erased from this device. There is no way to restore them — there is no server and no backup.",
+  "@deleteAllBody": {
+    "description": "Body of the delete-everything confirmation"
+  },
+
+  "deleteAllConfirm": "Delete",
+  "@deleteAllConfirm": {
+    "description": "The destructive confirm button"
+  },
+
+  "deleteAllFailed": "The data could not be deleted.",
+  "@deleteAllFailed": {
+    "description": "Shown when erasing the database or its key material failed"
+  },
+
+  "storageFailedTitle": "The application could not be opened",
+  "@storageFailedTitle": {
+    "description": "The encrypted database could not be opened — the key store was unreachable, or the key material is gone. Shown above everything else, because nothing in the application works without storage"
+  },
+
+  "storageFailedBody": "The encrypted store on this device could not be opened. Restarting sometimes helps; if it keeps happening, the data on this device may no longer be readable — there is no server and no backup to restore it from.",
+  "@storageFailedBody": {
+    "description": "Body of the storage failure. It does not promise recovery, because for a lost key there is none"
   },
 
   "retry": "Try again",
@@ -119,16 +445,6 @@
   "cancel": "Cancel",
   "@cancel": {
     "description": "Generic action that abandons a dialog without doing anything"
-  },
-
-  "tasksTitle": "Help requests",
-  "@tasksTitle": {
-    "description": "App bar title of the Tasks screen"
-  },
-
-  "tasksComingSoon": "Mutual aid is not built yet.",
-  "@tasksComingSoon": {
-    "description": "Placeholder shown on the Tasks screen until the feature is implemented"
   },
 
   "back": "Back",

@@ -4,7 +4,7 @@ import 'package:lev/core/l10n/app_localizations.dart';
 import 'package:lev/features/chat/data/fake_llm_service.dart';
 import 'package:lev/features/chat/domain/message_role.dart';
 import 'package:lev/features/chat/presentation/chat_screen.dart';
-import 'package:lev/features/chat/presentation/widgets/message_bubble.dart';
+import 'package:lev/core/widgets/lev_widgets.dart';
 
 import '../../../support/chat_harness.dart';
 
@@ -18,6 +18,9 @@ void main() {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
     hebrew = await AppLocalizations.delegate.load(const Locale('he'));
   });
+
+  /// The title carried by the harness's stand-in support resource.
+  const supportTitle = 'You are not alone with this';
 
   Future<String> conversationIn(ChatHarness harness) async =>
       (await harness.repository.createConversation()).id;
@@ -34,7 +37,7 @@ void main() {
 
     await harness.pump(tester, ChatScreen(conversationId: id));
 
-    expect(find.text(l10n.chatEmpty), findsOneWidget);
+    expect(find.text(l10n.conversationsEmptyTitle), findsOneWidget);
   });
 
   chatWidgetTest('a turn streams in and both sides persist',
@@ -68,8 +71,8 @@ void main() {
 
     // Part-way through: a bubble exists and is marked as still arriving.
     await tester.pump(const Duration(milliseconds: 35));
-    final streaming = tester.widgetList<MessageBubble>(
-      find.byType(MessageBubble),
+    final streaming = tester.widgetList<LevBubble>(
+      find.byType(LevBubble),
     );
     expect(streaming.any((b) => b.isStreaming), isTrue);
 
@@ -128,7 +131,7 @@ void main() {
 
     expect(find.text('said earlier'), findsOneWidget);
     expect(find.text('ok'), findsOneWidget);
-    expect(find.text(l10n.chatEmpty), findsNothing);
+    expect(find.text(l10n.conversationsEmptyTitle), findsNothing);
   }, replies: ['ok']);
 
   chatWidgetTest('the prefill state is shown, not a blank screen',
@@ -140,13 +143,13 @@ void main() {
     // blank or frozen screen here a defect, so the wait must be labelled.
     await harness.pump(tester, ChatScreen(conversationId: id), settle: false);
 
-    expect(find.text(l10n.chatPreparing), findsOneWidget);
+    expect(find.text(l10n.chatPreparingSession), findsOneWidget);
 
     await tester.pumpAndSettle();
 
-    expect(find.text(l10n.chatPreparing), findsNothing,
+    expect(find.text(l10n.chatPreparingSession), findsNothing,
         reason: 'it must clear once the session is open');
-    expect(find.text(l10n.chatEmpty), findsOneWidget);
+    expect(find.text(l10n.conversationsEmptyTitle), findsOneWidget);
   }, prefillDelay: const Duration(milliseconds: 200));
 
   group('failures', () {
@@ -157,7 +160,7 @@ void main() {
       await harness.pump(tester, ChatScreen(conversationId: id));
       await send(tester, 'hello');
 
-      expect(find.text(l10n.chatFailed), findsOneWidget);
+      expect(find.text(l10n.chatTruncatedTitle), findsOneWidget);
     }, mode: FakeEngineMode.failBeforeFirstToken);
 
     chatWidgetTest('a partial reply is kept when generation breaks',
@@ -177,17 +180,26 @@ void main() {
         mode: FakeEngineMode.failMidGeneration,
         replies: [List.filled(30, 'word').join(' ')]);
 
-    chatWidgetTest('a failure can be dismissed and the chat used again',
+    chatWidgetTest('asking again re-runs the turn without repeating the message',
         (tester, harness) async {
       final id = await conversationIn(harness);
 
       await harness.pump(tester, ChatScreen(conversationId: id));
       await send(tester, 'hello');
 
-      await tester.tap(find.text(l10n.dismiss));
+      expect(find.text(l10n.chatTruncatedTitle), findsOneWidget);
+
+      await tester.tap(find.text(l10n.retry));
       await tester.pumpAndSettle();
 
-      expect(find.text(l10n.chatFailed), findsNothing);
+      // The engine was asked a second time — the button is not a dismissal
+      // wearing a retry's label.
+      expect(harness.engine.received, hasLength(greaterThan(1)));
+
+      // And the user's message was not appended again. A duplicate would
+      // rewrite the conversation to say something she never said twice.
+      final stored = await harness.repository.messagesOf(id);
+      expect(stored.where((m) => m.text == 'hello'), hasLength(1));
     }, mode: FakeEngineMode.failBeforeFirstToken);
 
     chatWidgetTest('a stalled engine offers a way out', (tester, harness) async {
@@ -220,7 +232,11 @@ void main() {
 
       // Both. Replacing the answer with a canned notice would tell someone in
       // distress that saying the wrong thing gets them shut out.
-      expect(find.textContaining('reach out to someone'), findsOneWidget);
+      //
+      // The text is the *support resource's* now, not the pattern file's
+      // (technical-decisions #24): the pattern decides whether the card
+      // appears, and the asset decides what it says and which number it dials.
+      expect(find.text(supportTitle), findsOneWidget);
       expect(find.text('I hear you.'), findsOneWidget);
 
       // And the message itself is still a normal part of the conversation.
@@ -235,7 +251,7 @@ void main() {
       await harness.pump(tester, ChatScreen(conversationId: id));
       await send(tester, 'I had a hard day');
 
-      expect(find.textContaining('reach out to someone'), findsNothing);
+      expect(find.text(supportTitle), findsNothing);
     }, replies: ['That sounds tiring.']);
 
     chatWidgetTest('clears the notice once the next message is ordinary',
@@ -244,12 +260,12 @@ void main() {
 
       await harness.pump(tester, ChatScreen(conversationId: id));
       await send(tester, 'I want to die');
-      expect(find.textContaining('reach out to someone'), findsOneWidget);
+      expect(find.text(supportTitle), findsOneWidget);
 
       await send(tester, 'anyway, about work');
 
       // It belongs to the message that triggered it, not to the conversation.
-      expect(find.textContaining('reach out to someone'), findsNothing);
+      expect(find.text(supportTitle), findsNothing);
     }, replies: ['I hear you.', 'Tell me about work.']);
   });
 
@@ -299,6 +315,6 @@ void main() {
       Directionality.of(tester.element(find.byType(ChatScreen))),
       TextDirection.rtl,
     );
-    expect(find.text(hebrew.chatEmpty), findsOneWidget);
+    expect(find.text(hebrew.conversationsEmptyTitle), findsOneWidget);
   }, replies: ['בסדר']);
 }

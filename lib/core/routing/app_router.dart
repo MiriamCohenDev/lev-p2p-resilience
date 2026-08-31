@@ -2,15 +2,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/chat/presentation/chat_screen.dart';
-import '../../features/chat/presentation/conversation_list_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/mutual_aid/presentation/tasks_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import 'app_routes.dart';
 
 /// The application router.
 ///
-/// Exposed through Riverpod rather than as a global so tests (and future
-/// redirect logic, e.g. a PIN lock screen) can override it.
+/// Exposed through Riverpod rather than as a global so tests can override it.
+///
+/// **There is no onboarding redirect here.** Whether the welcome screen has been
+/// seen is a preference, and reading it means opening the encrypted database —
+/// an asynchronous answer that a `redirect` would have to guess at while it
+/// loads, and a `refreshListenable` to correct afterwards. It is a gate around
+/// the router instead: see `LevApp`. That also gives the database's own failure
+/// modes somewhere to be shown, which nothing did before.
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.home,
@@ -19,30 +25,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.home,
         name: AppRoutes.homeName,
         builder: (context, state) => const HomeScreen(),
-        // Nested so each screen is pushed rather than replacing the stack,
-        // giving every one a working back affordance.
+      ),
+      GoRoute(
+        path: AppRoutes.chat,
+        name: AppRoutes.chatName,
+        builder: (context, state) => const ChatScreen(),
         routes: [
           GoRoute(
-            path: AppRoutes.conversationsSegment,
-            name: AppRoutes.conversationsName,
-            builder: (context, state) => const ConversationListScreen(),
-            routes: [
-              GoRoute(
-                path: AppRoutes.chatSegment,
-                name: AppRoutes.chatName,
-                builder: (context, state) => ChatScreen(
-                  conversationId:
-                      state.pathParameters[AppRoutes.conversationIdParam]!,
-                ),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: AppRoutes.tasksSegment,
-            name: AppRoutes.tasksName,
-            builder: (context, state) => const TasksScreen(),
+            path: ':${AppRoutes.conversationIdParam}',
+            name: AppRoutes.conversationName,
+            builder: (context, state) => ChatScreen(
+              conversationId:
+                  state.pathParameters[AppRoutes.conversationIdParam],
+            ),
           ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.aid,
+        name: AppRoutes.aidName,
+        builder: (context, state) => const TasksScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        name: AppRoutes.settingsName,
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lev/core/l10n/app_localizations.dart';
 import 'package:lev/features/chat/domain/message.dart';
-import 'package:lev/features/chat/presentation/conversation_list_screen.dart';
+import 'package:lev/features/chat/presentation/widgets/conversation_history.dart';
 
 import '../../../support/chat_harness.dart';
 
-/// Browsing past conversations (technical-spec §9, 2.2): open one, resume it,
-/// delete it.
+/// Browsing past conversations (technical-spec §9, 2.2).
+///
+/// The list used to be a screen of its own; it is now the drawer on mobile and
+/// the permanent column on desktop, and the same widget in both
+/// (technical-decisions #22).
 void main() {
   late AppLocalizations l10n;
 
@@ -15,15 +18,24 @@ void main() {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
   });
 
-  chatWidgetTest('says so when there is nothing yet', (tester, harness) async {
-    await harness.pump(tester, const ConversationListScreen());
+  Future<void> pumpList(WidgetTester tester, ChatHarness harness) =>
+      harness.pump(
+        tester,
+        const Scaffold(body: ConversationHistory()),
+      );
 
-    expect(find.text(l10n.conversationsEmpty), findsOneWidget);
+  chatWidgetTest('says so when there is nothing yet', (tester, harness) async {
+    await pumpList(tester, harness);
+
+    // The promise is repeated at exactly the moment the user is about to write
+    // the first thing, which is where the sentence is worth something.
+    expect(find.text(l10n.conversationsEmptyTitle), findsOneWidget);
+    expect(find.text(l10n.conversationsEmptyBody), findsOneWidget);
   });
 
-  chatWidgetTest('lists conversations, most recently active first',
+  chatWidgetTest('groups by time, most recently active first',
       (tester, harness) async {
-    final at = DateTime.utc(2026, 8, 25, 10);
+    final now = DateTime.now();
 
     final quiet = await harness.repository.createConversation(title: 'quiet');
     final busy = await harness.repository.createConversation(title: 'busy');
@@ -31,43 +43,55 @@ void main() {
       Message.fromUserInput(
         conversationId: quiet.id,
         text: 'once',
-        createdAt: at,
+        createdAt: now.subtract(const Duration(minutes: 10)),
       ),
     );
     await harness.repository.append(
       Message.fromUserInput(
         conversationId: busy.id,
         text: 'later',
-        createdAt: at.add(const Duration(minutes: 5)),
+        createdAt: now,
       ),
     );
 
-    await harness.pump(tester, const ConversationListScreen());
+    await pumpList(tester, harness);
 
-    final titles = tester
-        .widgetList<ListTile>(find.byType(ListTile))
-        .map((tile) => (tile.title! as Text).data);
-    expect(titles, ['busy', 'quiet']);
+    expect(find.text(l10n.conversationGroupToday), findsOneWidget);
+    // Both under one heading, in the repository's order.
+    final busyY = tester.getTopLeft(find.text('busy')).dy;
+    final quietY = tester.getTopLeft(find.text('quiet')).dy;
+    expect(busyY, lessThan(quietY));
   });
 
   chatWidgetTest('a conversation with no message yet is labelled, not blank',
       (tester, harness) async {
     await harness.repository.createConversation();
 
-    await harness.pump(tester, const ConversationListScreen());
+    await pumpList(tester, harness);
 
     expect(find.text(l10n.conversationUntitled), findsOneWidget);
   });
 
-  chatWidgetTest('creating a conversation stamps the active model',
+  chatWidgetTest('searching that matches nothing explains rather than empties',
       (tester, harness) async {
-    // The whole app, because creating a conversation navigates into it and
-    // `context.go` needs a router above the screen.
-    await harness.pumpApp(tester);
-    await tester.tap(find.text(l10n.homeOpenChat));
+    await harness.repository.createConversation(title: 'about Shabbat');
+    await pumpList(tester, harness);
+
+    await tester.enterText(find.byType(TextField), 'zzzz');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text(l10n.conversationsNew));
+    expect(find.text(l10n.conversationsSearchEmptyTitle), findsOneWidget);
+    // A filtered empty state gets no action: there is nothing to do in it but
+    // change the search, so a button there would be noise.
+    expect(find.text(l10n.conversationsNew), findsNothing);
+  });
+
+  chatWidgetTest('creating a conversation stamps the active model',
+      (tester, harness) async {
+    // The whole app, because creating one navigates into it and `context.go`
+    // needs a router above the screen.
+    await harness.pumpApp(tester);
+    await tester.tap(find.text(l10n.homeStartChat));
     await tester.pumpAndSettle();
 
     // A one-shot query, not `watchConversations().first`. Awaiting `.first`
@@ -77,14 +101,14 @@ void main() {
     final conversations = await harness.conversations();
     expect(conversations, hasLength(1));
     expect(conversations.single.modelId, harness.model.id);
-  });
+  }, replies: ['ok']);
 
   chatWidgetTest('deleting asks first, and does nothing if declined',
       (tester, harness) async {
     await harness.repository.createConversation(title: 'keep me');
 
-    await harness.pump(tester, const ConversationListScreen());
-    await tester.tap(find.byTooltip(l10n.conversationDelete));
+    await pumpList(tester, harness);
+    await tester.longPress(find.text('keep me'));
     await tester.pumpAndSettle();
 
     expect(find.text(l10n.conversationDeleteTitle), findsOneWidget);
@@ -103,18 +127,20 @@ void main() {
       Message.fromUserInput(
         conversationId: conversation.id,
         text: 'private',
-        createdAt: DateTime.utc(2026, 8, 25),
+        createdAt: DateTime.now(),
       ),
     );
 
-    await harness.pump(tester, const ConversationListScreen());
-    await tester.tap(find.byTooltip(l10n.conversationDelete));
+    await pumpList(tester, harness);
+    await tester.longPress(find.text('goodbye'));
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.conversationDelete).last);
     await tester.pumpAndSettle();
 
     expect(find.text('goodbye'), findsNothing);
-    expect(find.text(l10n.conversationsEmpty), findsOneWidget);
+    expect(find.text(l10n.conversationsEmptyTitle), findsOneWidget);
+    // The row survives as a tombstone; its content does not
+    // (technical-decisions #15).
     expect(await harness.repository.messagesOf(conversation.id), isEmpty);
   });
 }

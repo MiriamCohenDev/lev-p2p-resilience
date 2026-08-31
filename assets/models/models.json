@@ -21,6 +21,7 @@
       "assetPath": "assets/models/qwen-en-q4.gguf",
       "sourceUrl": "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
       "sha256": "6eb923e7d26e9cea28811e1a8e852009b21242fb157b26149d3b188f3a8c8653",
+      "sizeBytes": 397808192,
       "language": "en",
       "minRamMb": 1536,
       "contextTokens": 4096,

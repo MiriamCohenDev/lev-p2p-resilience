@@ -41,6 +41,12 @@ dependencies:
   # Reading device RAM through FFI, for the min-spec gate (Section 8).
   ffi: ^2.2.0
 
+  # Opens the dialler for the support card's `tel:` action (technical-decisions
+  # #25). The only thing it is used for: a link to a website would be a dead
+  # button in an app with no network, so a phone call is the single action the
+  # safety layer offers.
+  url_launcher: ^6.3.2
+
   # Encrypted local database (technical-spec Section 5.5, technical-decisions #4).
   drift: ^2.34.3
   # Direct: the storage layer runs SQLCipher pragmas against it (see `hooks`).
@@ -93,3 +99,26 @@ flutter:
     # The versioned system prompt and the safety pattern lists (§5.2.1, §5.2.4).
     # Assets rather than string literals so both can be tuned without a rebuild.
     - assets/prompts/
+    # The support message, its phone number and its review date, per UI language
+    # (technical-decisions #24). An asset for the same reason the patterns are
+    # one: a number that has gone stale is worse than a message that never
+    # appeared, and it must be fixable without a rebuild.
+    - assets/support/
+
+  # Bundled, never downloaded: `google_fonts` fetches from the network on first
+  # run, which §8 makes a defect rather than a trade-off (technical-decisions
+  # #26). IBM Plex Sans Hebrew is OFL-licensed, so shipping it is permitted —
+  # assets/fonts/OFL.txt is the licence as published.
+  fonts:
+    - family: IBMPlexSansHebrew
+      fonts:
+        - asset: assets/fonts/IBMPlexSansHebrew-Light.ttf
+          weight: 300
+        - asset: assets/fonts/IBMPlexSansHebrew-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansHebrew-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansHebrew-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansHebrew-Bold.ttf
+          weight: 700

@@ -7,6 +7,7 @@ import '../../features/chat/data/conversation_summariser.dart';
 import '../../features/chat/data/default_prompt_builder.dart';
 import '../../features/chat/data/system_prompt.dart';
 import '../../features/chat/domain/safety_checker.dart';
+import '../support/support_resources.dart';
 import 'llm_providers.dart';
 
 /// The prompt layer's wiring (technical-spec §5.2). Hand-written providers, per
@@ -35,6 +36,17 @@ final systemPromptProvider = FutureProvider<SystemPrompt>((ref) async {
 /// person, not the model. Overridden from the widget tree, which is the only
 /// place the real locale is known.
 final safetyLocaleProvider = Provider<Locale>((ref) => const Locale('en'));
+
+/// What the support card says, and the number it dials (technical-decisions
+/// #24).
+///
+/// Localised for the person in front of the screen, exactly like
+/// [safetyCheckerProvider] and for the same reason. The content is an asset
+/// rather than a string in the pattern file so that a number can be corrected
+/// without a rebuild.
+final supportResourceProvider = FutureProvider<LevSupportResource>((ref) async {
+  return LevSupportResources.load(ref.watch(safetyLocaleProvider).languageCode);
+});
 
 /// Deterministic acute-distress detection (§5.2.4).
 final safetyCheckerProvider = FutureProvider<SafetyChecker>((ref) async {

@@ -83,18 +83,41 @@ class Messages extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// User preferences: interface language, appearance, whether the first-run
+/// screen has been seen.
+///
+/// A key/value table rather than a row of typed columns, because these are
+/// settings rather than entities: adding one is an insert, not a migration, and
+/// the set of them will keep growing while the shape never does. The keys
+/// themselves are owned by `PreferenceKeys` in `features/settings/domain`, where
+/// a value that cannot be parsed can be answered for.
+///
+/// **Why this is inside the encrypted database at all.** CLAUDE.md forbids
+/// writing user data to disk outside it, and while a theme choice is not
+/// sensitive, "sometimes we write outside the encrypted database" is not a rule
+/// anyone can hold. One store, one answer (technical-decisions #23).
+@DataClassName('PreferenceRow')
+class Preferences extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 /// The application database: `lev.db`, opened through SQLCipher.
 ///
-/// Chat only, at `schemaVersion 1`. The mutual-aid tables (`HelpRequest`,
-/// `HelpCommitment` — §6.1) arrive as schema **2** in Phase 4; that is what the
-/// explicit [migration] below exists to make obvious, even though `onCreate`
-/// currently does exactly what drift would default to.
-@DriftDatabase(tables: [Conversations, Messages], daos: [ChatDao])
+/// `schemaVersion 2` adds [Preferences]. The mutual-aid tables (`HelpRequest`,
+/// `HelpCommitment` — §6.1) join it at this version when Phase 4 lands.
+@DriftDatabase(
+  tables: [Conversations, Messages, Preferences],
+  daos: [ChatDao, PreferencesDao],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   /// Timestamps are stored as ISO-8601 **text**, not as unix seconds.
   ///
@@ -112,12 +135,24 @@ class AppDatabase extends _$AppDatabase {
   DriftDatabaseOptions get options =>
       const DriftDatabaseOptions(storeDateTimeAsText: true);
 
+  /// The first migration that actually runs.
+  ///
+  /// Schema 1 shipped nowhere, but by the time [Preferences] was added the chat
+  /// had been running against a real encrypted database on two platforms, so
+  /// there are `lev.db` files at version 1 in the wild — on the development
+  /// machines, at least. Creating one table is the whole of it; the dumps under
+  /// `drift_schemas/` are what let `test/core/db/migration_test.dart` prove it
+  /// rather than hope about it.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
-        // onUpgrade lands here with the Phase 4 tables. `drift_schemas/` holds a
-        // dump of this version so that migration can be tested rather than
-        // hoped about.
+        onUpgrade: (m, from, to) async {
+          if (from < 2) await m.createTable(preferences);
+        },
+        // Set per connection, and re-set here because a migration opens its own.
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON;');
+        },
       );
 }
 
@@ -221,4 +256,45 @@ class ChatDao extends DatabaseAccessor<AppDatabase> with _$ChatDaoMixin {
       ),
     );
   }
+}
+
+/// Preference reads and writes.
+///
+/// [watch] rather than a one-shot read is what lets the appearance and the
+/// language change the moment the user picks them, without the settings screen
+/// having to reach up and rebuild the application root.
+@DriftAccessor(tables: [Preferences])
+class PreferencesDao extends DatabaseAccessor<AppDatabase>
+    with _$PreferencesDaoMixin {
+  PreferencesDao(super.db);
+
+  Stream<Map<String, String>> watchAll() {
+    return select(preferences).watch().map(
+          (rows) => {for (final row in rows) row.key: row.value},
+        );
+  }
+
+  Future<String?> read(String key) async {
+    final row = await (select(preferences)..where((p) => p.key.equals(key)))
+        .getSingleOrNull();
+    return row?.value;
+  }
+
+  /// Writing `null` removes the key, which is what "follow the device" is: the
+  /// absence of a choice, not a third stored value. Storing a sentinel would
+  /// mean every reader had to know the sentinel.
+  Future<void> write(String key, String? value) async {
+    if (value == null) {
+      await (delete(preferences)..where((p) => p.key.equals(key))).go();
+      return;
+    }
+    await into(preferences).insertOnConflictUpdate(
+      PreferencesCompanion.insert(key: key, value: value),
+    );
+  }
+
+  /// Erases every preference. Part of "delete all data" — the theme choice is
+  /// not sensitive, but "start over" that leaves settings behind is not a start
+  /// over.
+  Future<void> clear() => delete(preferences).go();
 }

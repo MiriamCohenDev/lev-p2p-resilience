@@ -30,6 +30,19 @@ abstract class KeyManager {
   /// no-op until PIN mode exists.
   Future<void> sweepIncompleteRewrap();
 
+  /// Erases every stored key, and the cached DEK with them.
+  ///
+  /// **Irreversible, and it makes any `lev.db` still on disk permanently
+  /// unreadable** — the DEK it was encrypted with no longer exists anywhere,
+  /// and there is no server and no backup. This is the key-material half of
+  /// "delete all data"; deleting the database file itself belongs to the
+  /// storage layer, which is the only one that knows where the file is.
+  ///
+  /// **The file must go first.** Removing the keys before the file leaves an
+  /// encrypted database that nothing can open and that the application can no
+  /// longer offer to delete, because the screen that offers it cannot start.
+  Future<void> destroyKeyMaterial();
+
   /// Wipes the cached DEK. The next [obtainDek] re-reads and re-unwraps it.
   void dispose();
 }
@@ -156,6 +169,19 @@ class DefaultKeyManager implements KeyManager {
     if (KeyRecord.decode(rawRecord).wrapping != KeyWrappingMode.secureStorage) {
       await _store.delete(KeyStoreKeys.kek);
     }
+  }
+
+  @override
+  Future<void> destroyKeyMaterial() async {
+    // The record first: it is what `obtainDek` reads to decide whether an
+    // installation exists at all. If the process dies between the two deletes,
+    // what is left is a stored KEK with no record — the loud
+    // `MissingKeyMaterial.wrappedDek` state, which `sweepIncompleteRewrap` does
+    // not touch and which a fresh provision can recover from safely once the
+    // database file is also gone.
+    await _store.delete(KeyStoreKeys.record);
+    await _store.delete(KeyStoreKeys.kek);
+    dispose();
   }
 
   @override

@@ -1,36 +1,121 @@
 {
   "@@locale": "he",
 
-  "appTitle": "לב",
-  "homeTagline": "מרחב שקט לתמיכה ולעזרה הדדית.",
-  "homeDescription": "לב פועלת כולה על המכשיר שלך. אפשר לשוחח ולעבד דברים עם עוזר מקומי, או להושיט יד ולקבל עזרה מהסביבה הקרובה. בלי חשבון, בלי שרת, שום דבר לא יוצא מהמכשיר הזה.",
-  "homeOpenChat": "התחלת שיחה",
-  "homeOpenTasks": "בקשות עזרה",
+  "appTitle": "LEV",
+
+  "navHome": "בית",
+  "navChat": "צ'אט",
+  "navAid": "עזרה",
+
+  "welcomeTagline": "מקום שקט לדבר בו, ורשת עזרה קטנה של אנשים לידך.",
+  "welcomePrivacy": "הכול נשאר על המכשיר שלך. אין חשבון, אין הרשמה, ואין חיבור לאינטרנט.",
+  "welcomeLockTitle": "לנעול בקוד",
+  "welcomeLockWarning": "אם תשכחי את הקוד אין דרך לשחזר אותו, והנתונים יאבדו. אין שרת שיכול לעזור.",
+  "lockUnavailable": "נעילה בקוד עדיין לא זמינה בגרסה הזאת.",
+  "welcomeStart": "להתחיל",
+
+  "homeGreetingMorning": "בוקר טוב",
+  "homeGreetingAfternoon": "צהריים טובים",
+  "homeGreetingEvening": "ערב טוב",
+  "homePromptMorning": "איך את מרגישה הבוקר?",
+  "homePromptAfternoon": "איך את מרגישה היום?",
+  "homePromptEvening": "איך את מרגישה הערב?",
+  "homeStartChat": "להתחיל שיחה",
+  "homeResumeLabel": "להמשיך מאיפה שהפסקת",
 
   "conversationsTitle": "שיחות",
-  "conversationsEmpty": "עדיין אין שיחות. אפשר להתחיל מתי שנוח לך.",
   "conversationsNew": "שיחה חדשה",
+  "conversationsSearchHint": "חיפוש בשיחות",
+  "conversationsEmptyTitle": "עוד לא דיברנו",
+  "conversationsEmptyBody": "מה שתכתבי כאן נשמר מוצפן על המכשיר שלך בלבד, ולא יוצא ממנו לשום מקום.",
+  "conversationsSearchEmptyTitle": "לא נמצאה שיחה",
+  "conversationsSearchEmptyBody": "אפשר לחפש גם מילה מתוך ההודעות עצמן, לא רק מהכותרת.",
+  "conversationGroupToday": "היום",
+  "conversationGroupLastWeek": "7 הימים האחרונים",
+  "conversationGroupEarlier": "קודם",
   "conversationUntitled": "שיחה ללא כותרת",
   "conversationDelete": "מחיקה",
   "conversationDeleteTitle": "למחוק את השיחה הזאת?",
   "conversationDeleteBody": "ההודעות שלה יימחקו מהמכשיר הזה. אי אפשר לבטל את הפעולה.",
 
+  "stamp": "{day} · {time}",
+  "@stamp": {
+    "placeholders": {
+      "day": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "dayToday": "היום",
+  "dayYesterday": "אתמול",
+
   "chatTitle": "שיחה",
-  "chatInputHint": "כתיבת הודעה",
+  "chatInputHint": "כתבי כאן…",
   "chatSend": "שליחה",
   "chatStop": "עצירה",
-  "chatTyping": "לב כותבת…",
-  "chatPreparing": "מכינה את השיחה…",
-  "chatEmpty": "אפשר לכתוב כל מה שעל הלב.",
-  "chatFailed": "לא הצלחנו לסיים את התשובה.",
+  "chatTyping": "כותב תשובה",
+  "chatPreparingSession": "מכינה את השיחה…",
+  "chatPreparingModelTitle": "מכינה את המודל",
+  "chatPreparingModelBody": "זה קורה פעם אחת בלבד. אחרי זה הפתיחה מיידית.",
+  "chatPreparingModelOffline": "בלי חיבור לאינטרנט",
+  "chatTruncatedTitle": "התשובה נקטעה",
+  "chatTruncatedBody": "משהו הפסיק את היצירה באמצע. השיחה נשמרה, אפשר לנסות שוב.",
   "chatLoadFailed": "לא הצלחנו לפתוח את השיחה הזאת.",
+
+  "modelIntegrityTitle": "לא הצלחנו לטעון את המודל",
+  "modelIntegrityBody": "קובץ המודל אינו תקין או השתנה מאז ההתקנה. ייתכן שההעתקה בין המכשירים נקטעה.",
+  "modelIntegrityAction": "לייבא את הקובץ מחדש",
+  "modelTooSmallTitle": "המכשיר הזה קטן על המודל",
+  "modelTooSmallBody": "לצ'אט דרוש זיכרון פנוי שאין כאן, והוא היה נתקע. אפשר לנסות מודל קטן יותר אם קיים כזה במכשיר.",
+  "modelTooSmallAction": "לבחור מודל אחר",
+  "modelUnavailableTitle": "לא הצלחנו לפתוח את הצ'אט",
+  "modelUnavailableBody": "מודל השפה אינו זמין במכשיר הזה. הוא מותקן יחד עם האפליקציה, ובלעדיו השיחה לא יכולה לרוץ.",
+  "aidStillWorks": "העזרה ההדדית ממשיכה לעבוד כרגיל.",
+
+  "aidTitle": "עזרה",
+  "aidComingSoonTitle": "העזרה ההדדית עדיין לא נבנתה",
+  "aidComingSoonBody": "כשהיא תהיה מוכנה, כאן יופיעו בקשות עזרה מהסביבה הקרובה — והכול יישאר על המכשיר.",
+
+  "settingsTitle": "הגדרות",
+  "settingsGroupGeneral": "כללי",
+  "settingsLanguage": "שפת הממשק",
+  "settingsAppearance": "מראה",
+  "settingsFollowDevice": "לפי המכשיר",
+  "settingsAppearanceLight": "בהיר",
+  "settingsAppearanceDark": "כהה",
+  "languageHebrew": "עברית",
+  "languageEnglish": "English",
+  "settingsGroupModel": "מודל השפה",
+  "settingsActiveModel": "המודל הפעיל",
+  "settingsModelValue": "{family} · {language}",
+  "@settingsModelValue": {
+    "placeholders": {
+      "family": { "type": "String" },
+      "language": { "type": "String" }
+    }
+  },
+  "settingsModelOnDevice": "רץ על המכשיר, בלי רשת",
+  "settingsModelOnDeviceWithSize": "{size} ג'יגה · רץ על המכשיר, בלי רשת",
+  "@settingsModelOnDeviceWithSize": {
+    "placeholders": {
+      "size": { "type": "String" }
+    }
+  },
+  "settingsGroupPrivacy": "פרטיות",
+  "settingsLock": "נעילה בקוד",
+  "settingsDeleteAll": "מחיקת כל הנתונים",
+  "settingsGroupAbout": "אודות",
+  "settingsVersion": "גרסה",
+
+  "deleteAllTitle": "למחוק את כל הנתונים?",
+  "deleteAllBody": "כל השיחות והבקשות יימחקו מהמכשיר. אין דרך לשחזר אותן — אין שרת ואין גיבוי.",
+  "deleteAllConfirm": "למחוק",
+  "deleteAllFailed": "לא הצלחנו למחוק את הנתונים.",
+
+  "storageFailedTitle": "לא הצלחנו לפתוח את האפליקציה",
+  "storageFailedBody": "לא הצלחנו לפתוח את המאגר המוצפן במכשיר הזה. לפעמים הפעלה מחדש עוזרת; אם זה חוזר, ייתכן שהנתונים במכשיר כבר לא ניתנים לקריאה — אין שרת ואין גיבוי לשחזר מהם.",
 
   "retry": "לנסות שוב",
   "dismiss": "סגירה",
   "cancel": "ביטול",
-
-  "tasksTitle": "בקשות עזרה",
-  "tasksComingSoon": "העזרה ההדדית עדיין לא נבנתה.",
-
   "back": "חזרה"
 }

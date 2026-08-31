@@ -151,7 +151,7 @@
 
 ## #9 — Routing: `go_router`
 
-**Status:** Accepted
+**Status:** Accepted — the nesting half **superseded by #22**
 
 **Decision.** Use **`go_router`** for navigation, with the router exposed as a Riverpod `Provider<GoRouter>` (`lib/core/routing/app_router.dart`) rather than as a global. Route paths and names live in a single `AppRoutes` constants class; screens never hardcode route strings. Chat and Tasks are declared as **nested routes under Home**, so each carries a real back stack.
 
@@ -636,7 +636,7 @@ them.
 
 ## #18 — The safety layer follows the person, and never replaces the reply
 
-**Status:** Accepted
+**Status:** Accepted — the presentation half **superseded by #24**
 
 **Decision.** `AssetSafetyChecker` matches the user's raw message against
 `assets/prompts/safety_patterns_<locale>.json` **before** it reaches the model.
@@ -899,6 +899,263 @@ estimate, now a model-specific one. `HeuristicTokenizer` is superseded by
 constant, so nothing that depended on the old behaviour changed. The three
 comments promising a direct swap in `tokenizer.dart`, `heuristic_tokenizer.dart`
 and `prompt.dart` are corrected to point here.
+
+---
+
+## #21 — The design system is the only source of colour, size and spacing
+
+**Status:** Accepted
+
+**Decision.** Every colour, radius, spacing value and text style in the
+application comes from `lib/core/theme/app_theme.dart`. Semantic roles that
+Material's `ColorScheme` has no vocabulary for — `raised`, `warm`, `done`,
+`lineStrong` — live in a `LevColors` `ThemeExtension`, and `ColorScheme` itself
+is **derived from those tokens** rather than seeded from a colour. Screens are
+built from `lib/core/widgets/lev_widgets.dart`; a screen that writes its own
+`Container` with a colour is a defect.
+
+The destructive red (`#9B3B36` light, `#E0928C` dark) is deliberately **not** in
+`LevColors`. It sits in a separate `LevDestructive` holder and reaches exactly
+one control: the confirm button of "delete all data".
+
+**Rationale.** The palette is what makes the product read as calm, and a seeded
+Material scheme cannot express the distinctions this product actually makes —
+"a person is involved" is a *role*, not a shade, and it has to mean the same
+thing on a status pill, on a support card and nowhere else. Putting the roles in
+a `ThemeExtension` is what lets `LevStatusPill` and `LevSupportCard` share one
+rule instead of two similar-looking constants.
+
+Keeping the red out of the token set is the same argument inverted. What gives
+it force when it appears is that nothing else in the interface is ever this
+colour: a cancelled help request goes grey, a model that failed its integrity
+check goes amber. A red that is reachable from the palette becomes a red that
+gets used.
+
+**Rejected alternatives.**
+
+- *`ColorScheme.fromSeed`, as Phase 0 shipped* — one line, and every Material
+  widget themed for free. Rejected: it generates tonal ramps, not roles, so the
+  amber that means "a human took this" would have been picked per call site and
+  would have drifted within a month.
+- *Colours as plain constants in a `LevPalette` class* — simpler than a
+  `ThemeExtension`. Rejected: it cannot vary with brightness through
+  `Theme.of(context)`, so every widget would need its own light/dark branch, and
+  dark mode here is not an inversion — the turquoise lightens to `#6FB3BF` and
+  the ink stops at `#E8EAE7` rather than going white.
+- *Keeping `#9B3B36` in `LevColors` as `danger`* — tidier. Rejected on the
+  reachability argument above.
+
+**Consequence.** `test/core/rtl_lint_test.dart` sweeps `lib/` for
+`EdgeInsets.only` / `Alignment.centerLeft` and friends on every run, because
+those compile, look right in English, and strand content on the wrong edge in
+Hebrew. A line that genuinely needs one says `// rtl-ok`.
+
+---
+
+## #22 — Three sibling destinations, not a navigation stack
+
+**Status:** Accepted — supersedes the nesting half of #9
+
+**Decision.** Routes are flat: `/`, `/chat`, `/chat/:conversationId`, `/aid`,
+`/settings`. `LevShell` renders a `NavigationBar` below 900px and a
+`NavigationRail` above it, and switching destinations is `context.go`, never
+`push`. `ConversationListScreen` is deleted; the conversation list is now
+`LevConversationList` inside `Scaffold.drawer` on mobile and a fixed 250px column
+on desktop — **one widget**, which decides between the two behaviours by asking
+`Scaffold.maybeOf(context)?.hasDrawer`. Settings is the one screen that is
+pushed, because it has a back affordance.
+
+**Rationale.** #9 declared Chat and Tasks nested under Home "so each carries a
+real back stack". The design has three permanent destinations in a bar, and tabs
+are siblings: going Home from a conversation is not "back", and rendering it as
+back produces a stack that grows every time someone switches tabs.
+
+What the nesting bought was per-branch navigation state, and here that is
+actively unwanted. `chatNotifierProvider` is `autoDispose` precisely because
+§5.1 wants a conversation's session — and the KV cache it owns — released when
+the conversation is left; preserving a branch's state would hold that memory for
+every conversation ever opened, which is the case §8's memory requirement rules
+out.
+
+**Rejected alternatives.**
+
+- *`StatefulShellRoute.indexedStack`* — go_router's own answer for exactly this
+  shape, and it preserves each branch's stack. Rejected on two counts: the state
+  preservation is the thing we do not want (above), and the shell would then own
+  the app bar, so every screen would need a channel to publish its own title,
+  actions and side list up into it — an inherited widget, or a provider, to
+  replace three constructor arguments.
+- *Keeping #9's nesting and adding a bar on top of it* — least code changed.
+  Rejected: the bar and the stack would then disagree about where "back" goes,
+  which is the bug, not the fix.
+
+**Consequence — one capability had to be re-homed.** Deleting a conversation
+lived on the list screen that no longer exists, and the design draws no delete
+control anywhere. Dropping it was not an option in a privacy product, and putting
+a visible destructive button on every row would be wrong in the quietest list
+here, so it is a long press (announced by screen readers) or a secondary tap.
+**A keyboard-only desktop user cannot currently reach it** — recorded as a real
+gap, not an oversight.
+
+---
+
+## #23 — Interface preferences live in the encrypted database, at schema 2
+
+**Status:** Accepted
+
+**Decision.** A `preferences` table — `key TEXT PRIMARY KEY`, `value TEXT` —
+holding three keys: `ui.languageCode`, `ui.appearance`, `onboarding.seenAt`.
+`schemaVersion` goes to **2** with a real `onUpgrade`. Following the device is
+stored as the **absence of the row**, not as a third value.
+
+**Rationale.** CLAUDE.md forbids writing user data to disk outside the encrypted
+database. A theme choice is not sensitive, but "sometimes we write outside the
+encrypted database" is not a rule anyone can hold, and the exception would be
+cited the next time something almost-not-sensitive needed persisting. One store,
+one answer. It is also the table the mutual-aid feature's own schema-2 tables
+will land beside, so the migration is written once.
+
+Key/value rather than typed columns because these are settings, not entities:
+adding one is an insert, and the shape never changes. Absence-as-default because
+"follow the device" is the lack of a choice — a sentinel would oblige every
+reader to know the sentinel, and the first one to forget would silently pin a
+theme.
+
+**Rejected alternatives.**
+
+- *`shared_preferences`* — a plaintext file, one dependency, ten minutes' work.
+  Rejected on the rule above.
+- *`flutter_secure_storage`, already a dependency* — no new file and no schema
+  change. Rejected: that store is for key material, and #12's fail-closed
+  contract ("absent is not failure") exists to protect exactly two entries.
+  Putting a theme preference beside them makes a read failure there ambiguous.
+- *Typed columns for the three settings* — compile-time safety. Rejected: the
+  fourth setting would then be a migration across four platforms.
+
+**Consequence — this is the first migration that actually runs.** #14 wrote an
+`onUpgrade` that was documentation. `test/core/db/migration_test.dart` seeds a
+real schema-1 file from raw DDL and upgrades it. It does **not** use `drift_dev
+schema generate`'s helpers: those name each field after its column, and
+`messages.text` collides with drift's own `Table.text` builder — the very
+collision `Messages.body` with `named('text')` exists to avoid (#14) — so the
+generated snapshot does not compile. The DDL in the test is the schema
+`drift_schemas/drift_schema_v1.json` describes, column for column.
+
+The migration also re-applies `PRAGMA foreign_keys` in `beforeOpen`, because a
+migration opens its own connection and the pragma is per-connection.
+
+---
+
+## #24 — The support message is an asset, and it supersedes the pattern file's copy
+
+**Status:** Accepted — supersedes the presentation half of #18
+
+**Decision.** What the safety layer *shows* moves to
+`assets/support/<locale>.json`: a title, a body, a call label, a phone number, a
+service name, and a `reviewedOn` date. `SafetyVerdict.matched` remains the
+trigger; `supportMessage` in `assets/prompts/safety_patterns_<locale>.json` is no
+longer what appears on screen. The card's only action is `tel:`, launched with
+`url_launcher`.
+
+**Rationale.** #18 was right that the message must be localised data rather than
+a string in Dart, and right that it appears *alongside* the reply. What it could
+not anticipate is that the card the design specifies needs four fields and a
+dialable number, and a single `supportMessage` string cannot carry a number that
+`Uri(scheme: 'tel')` will accept. Splitting them also separates two things with
+genuinely different lifetimes: the patterns change when the *language* is tuned,
+the number changes when a *service* does.
+
+`reviewedOn` is the point of the file. A number that has gone stale is worse than
+a message that never appeared, so the date is in the asset and
+`test/core/support/support_resources_test.dart` asserts every shipped locale has
+one, that the number is digits only, and — deliberately — that the body promises
+neither anonymity nor confidentiality. That varies between services and between
+circumstances, and it is not ours to promise on someone else's behalf.
+
+**Rejected alternatives.**
+
+- *Widen `supportMessage` into an object inside the pattern file* — one asset
+  instead of two. Rejected: it couples "which phrasings count as distress" to
+  "which service answers the phone", and the second is reviewed on a schedule
+  the first is not.
+- *Let the card fall back silently to nothing when the asset cannot be read* —
+  less code. Rejected outright. The chat screen renders the raw
+  `state.safetyNotice` on the same amber ground instead; silently dropping this
+  particular message is the one outcome not on the table.
+- *A link to the service's website beside the number* — more ways to reach help.
+  Rejected: this is an application with no network, and a link is a dead button.
+
+**Consequence.** Adding a language now means a pattern file, a support resource,
+a corpus entry and an ARB — no code change. The widget itself does not know
+`url_launcher` exists: it takes `onCall` and the screen decides, which is what
+keeps `lev_widgets.dart` free of platform plugins.
+
+---
+
+## #25 — `url_launcher`, for one URI scheme
+
+**Status:** Accepted
+
+**Decision.** Add `url_launcher`. It is used in exactly one place: opening the
+dialler for the support card's number.
+
+**Rationale.** Technical-spec §4 lists the stack and CLAUDE.md forbids
+substituting it without approval; this is an addition rather than a substitution,
+recorded here so it is a decision rather than a drift. The alternative to a
+plugin is a per-platform method channel for `tel:`, which is the same code with
+four copies to maintain. It makes no network call and requests no permission —
+`ACTION_DIAL` opens the dialler with the number typed in and the person presses
+the call button, so nothing here can place a call on its own.
+
+**Rejected alternatives.**
+
+- *A hand-rolled `MethodChannel` per platform* — no dependency. Rejected on
+  four-platform maintenance for a two-line feature.
+- *Showing the number as selectable text and letting the user dial it* — zero
+  dependencies, and honest. Rejected: at the moment this card appears, asking
+  someone to copy digits by hand is asking too much.
+
+**Consequence.** `canLaunchUrl` failing is swallowed. A desktop with no dialler
+shows the number and does nothing when pressed, which is the correct outcome —
+the number is on screen either way, and throwing here would put a crash on the
+most fragile screen in the product.
+
+---
+
+## #26 — IBM Plex Sans Hebrew is bundled, never fetched
+
+**Status:** Accepted
+
+**Decision.** Five weights of IBM Plex Sans Hebrew (Light through Bold) ship in
+`assets/fonts/` and are declared in `pubspec.yaml`. **`google_fonts` is not
+used.** The OFL licence is committed beside them as `assets/fonts/OFL.txt`.
+
+**Rationale.** `google_fonts` downloads its font from the network on first run
+and caches it. §8 makes a runtime network call a defect rather than a trade-off,
+so the package cannot be used here at all — and its failure mode is quiet, since
+it falls back to a system font and merely looks wrong. Bundling costs about
+490 KB for all five weights, which is nothing beside the model.
+
+The typography depends on the specific face: body text is set at 1.7 line height
+because Hebrew has no ascenders or descenders to break up a line, and dense text
+reads as a block. A fallback face would undo the one decision the type scale is
+actually making.
+
+**Rejected alternatives.**
+
+- *`google_fonts`* — one line, no assets. Rejected on the offline rule.
+- *The system font* — zero bytes. Rejected: the screens would not match the
+  design, and the Hebrew system font differs on every target platform, so
+  "cross-platform parity" (§8) would fail on the most visible axis there is.
+- *Three weights instead of five* — saves roughly 200 KB. Rejected as a false
+  economy at this size; Light and Bold exist for states the design has not
+  finished specifying, and re-adding a weight later means re-testing every
+  screen.
+
+**Consequence.** Downloading the fonts is a **build-time** network fetch, like
+the SQLCipher and llama.cpp build hooks (#13, #19). Same conclusion as both: it
+does not breach the offline rule, which governs runtime — but the files are
+committed, so unlike those hooks this one does not need a mirror in Phase 5.
 
 ---
 

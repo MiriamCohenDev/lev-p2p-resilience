@@ -20,6 +20,7 @@ class ModelDescriptor {
     required this.replyTokenReserve,
     required this.stopTokens,
     required this.quantization,
+    this.sizeBytes,
   });
 
   factory ModelDescriptor.fromJson(Map<String, Object?> json) {
@@ -45,6 +46,9 @@ class ModelDescriptor {
       replyTokenReserve: require<int>('replyTokenReserve'),
       stopTokens: require<List<Object?>>('stopTokens').cast<String>(),
       quantization: require<String>('quantization'),
+      // Optional, and read leniently: it is shown to the user and never acted
+      // on, so a manifest without it should still load.
+      sizeBytes: json['sizeBytes'] is int ? json['sizeBytes']! as int : null,
     );
   }
 
@@ -80,6 +84,25 @@ class ModelDescriptor {
 
   /// e.g. `Q4_K_M`.
   final String quantization;
+
+  /// The GGUF's size on disk, for the Settings screen.
+  ///
+  /// Declared in the manifest rather than measured, and that is not laziness:
+  /// `ModelFileStore.pathFor` verifies the digest by streaming the whole file,
+  /// so asking it for a path merely to call `length()` would re-hash several
+  /// hundred megabytes every time Settings is opened. Nothing depends on this
+  /// value being right — it is displayed, never enforced — so a stale number
+  /// misinforms rather than breaks, and it sits beside the `sha256` that *is*
+  /// enforced.
+  ///
+  /// Nullable: a manifest entry without it simply shows no size.
+  final int? sizeBytes;
+
+  /// The size in whole tenths of a gigabyte, as Settings writes it, or `null`
+  /// when [sizeBytes] is absent. Decimal GB, matching what an installer reports.
+  String? get sizeInGigabytes => sizeBytes == null
+      ? null
+      : (sizeBytes! / 1000000000).toStringAsFixed(1);
 
   /// What `PromptBuilder` must fit everything into (§5.2.3).
   int get promptBudgetTokens => contextTokens - replyTokenReserve;
