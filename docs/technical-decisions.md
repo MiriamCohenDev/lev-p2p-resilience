@@ -690,6 +690,218 @@ waiting on it. The real assets are parsed and checked in their own test files.
 
 ---
 
+## #19 — The llama.cpp binding is `llamadart`, and the weights are not in git
+
+**Status:** Accepted
+
+**Decision.** Three parts.
+
+1. **The binding is `llamadart`**, not either package technical-spec §4 and
+   Appendix A name. Native llama.cpp binaries are resolved by its Dart **build
+   hook** — the same mechanism SQLCipher already arrives through (#13) — so there
+   is no C++ toolchain and no per-platform plugin wiring. The hook is restricted
+   in `pubspec.yaml` to the llama.cpp runtime only:
+
+   ```yaml
+   hooks:
+     user_defines:
+       llamadart:
+         llamadart_native_runtimes: llama_cpp
+   ```
+
+2. **The GGUF is not committed.** `assets/models/*.gguf` is gitignored. The
+   manifest is the source of truth: it names the file, pins its `sha256`, and
+   carries a `sourceUrl` that **only** `tool/fetch_model.dart` reads.
+   `ModelDescriptor` has no `sourceUrl` field, so no code under `lib/` can reach
+   it even by accident.
+
+3. **`InstalledModelFileStore` resolves weights to a real file**, checking the
+   digest (§7.5) before llama.cpp sees them: an installed copy in the app support
+   directory first, the bundled asset extracted once otherwise, and a typed
+   failure if neither exists.
+
+**Rationale.**
+
+*On the binding.* §4 says to "evaluate current maintenance at Phase 2 start", and
+the evaluation disqualified both names. The published `fllama` is `0.0.1`, 21
+months old, Android/iOS only, from an unverified uploader — and desktop is a
+first-class target here, not an afterthought. `llama_cpp_dart` is real and
+maintained, but ships **no binaries**: adopting it means building llama.cpp for
+Android, Windows, macOS and Linux and owning those artifacts, which is precisely
+the "riskiest, most environment-dependent part of the build" §9 reordered the
+phases to contain. `llamadart` was released five days before this decision,
+covers all four targets plus iOS, and — decisively — resolves binaries through
+build hooks, so the project acquires no second native-build story. Its API
+covers every contract Phase 2 wrote against without adaptation: raw-prompt
+`generate` (so the chat keeps owning its own templates, #16), `stopSequences`,
+`cancelGeneration`, `getTokenCount`, and `reusePromptPrefix` for KV reuse.
+
+*On the runtime restriction.* Measured, not assumed. An unrestricted build
+emitted **~165 MB** of native libraries on Windows, of which ~75 MB was LiteRT-LM
+and a WebGPU/Dawn stack that LEV never calls — §3 names llama.cpp as the engine
+and §8 makes install size a budget. With the define, the same build emits ~56 MB.
+Verified by deleting the LiteRT DLLs and rebuilding: they do not come back.
+
+*On keeping weights out of git.* Hundreds of megabytes of binary that git cannot
+diff, that every clone pays for again, and that every branch switch rewrites.
+The digest in the manifest is what makes the file's absence safe: what matters
+for correctness is not that the bytes are in the repository but that the bytes on
+disk are provably the right ones, and §7.5 already requires exactly that check.
+
+*On the file store.* llama.cpp opens (and prefers to `mmap`) a filesystem path,
+and a Flutter asset is not a file — on Android it is an entry inside the APK.
+Something has to place the weights, verify them, and do it once. Extraction is
+written to a `.part` file and renamed, because a rename is atomic on every target
+platform: a file at the real path is therefore always complete, and a crash
+mid-extraction cannot leave a truncated file that fails its digest forever with
+nothing able to repair it. The same path serves the sideload case — a user who
+cannot take a 2 GB installer drops the GGUF in the directory and it is picked up,
+having passed the identical check.
+
+**Rejected alternatives.**
+
+- *`llama_cpp_dart`, as the spec's Appendix A suggests* — closest to the written
+  word, and genuinely maintained. Rejected on the binaries: four cross-compiled
+  native builds to own and re-cut on every llama.cpp bump, for one developer.
+- *A custom `dart:ffi` layer*, which §4 permits "only if bindings prove
+  inadequate" — they did not prove inadequate. Rejected as weeks of work to
+  reach a worse version of what the hook already delivers.
+- *Committing the GGUF* — one fewer setup step, and the repository is then
+  self-contained. Rejected on repository weight, and it does not even buy
+  integrity: a committed file still has to be checked, because the threat §7.5
+  names is corruption and tampering on the user's disk, not in git.
+- *Downloading the model at first run from inside the app* — the smoothest
+  onboarding by a distance. **Rejected outright**: §8 makes a runtime network
+  call a defect, not a trade-off, and this is the single most tempting place in
+  the project to breach that. The `sourceUrl`/`ModelDescriptor` split exists so
+  the temptation is not merely resisted but structurally unavailable.
+- *Loading the GGUF straight from the asset bundle* — no extraction, no second
+  copy on disk. Not possible: llama.cpp needs a path, and on Android there is
+  none.
+
+**Consequence — four things, and the first is a live gap.**
+
+- **Fetching the weights needed a network exception, and the obvious diagnosis
+  was wrong.** The machine runs a NetFree content filter, and `huggingface.co`
+  is **not** blocked — a `config.json` fetches normally, which is why nothing
+  looked blocked in the filter's settings. What is blocked is the CDN every
+  large file redirects to: `us.aws.cdn.hf.co`, returning `HTTP 418` with
+  `"block":"risk-type"`. Host-based, not extension-based — a `.safetensors` is
+  refused exactly like a `.gguf`, while an 18 MB `.zip` from GitHub Releases
+  downloads fine. That last fact is why the llama.cpp binaries resolve and the
+  build works at all. The Ollama registry is blocked too. The GGUF was
+  ultimately brought in by hand and verified against the pin.
+- **The digest is pinned even though the file was never downloaded.** HuggingFace
+  serves the LFS pointer as ordinary text at the `raw` endpoint — outside the
+  blocked CDN — and it carries `oid sha256:` and `size` for the object. Those
+  were read directly and cross-checked against the `X-Linked-ETag` and
+  `X-Linked-Size` headers on the blocked request; all four agree
+  (`6eb923e7…8653`, 397 808 192 bytes).
+
+  This is a better position than pinning after a download, not a worse one: the
+  digest arrives over a different channel from the bytes it will authenticate,
+  so §7.5's check actually verifies the transfer rather than merely restating it.
+  Hashing whatever happened to land on disk and calling that the pin would have
+  authenticated nothing.
+- `ggml-vulkan.dll` (35.6 MB) is still emitted. Kept deliberately: GPU offload is
+  a real desktop win and §8 asks about performance as well as size. Trimming it
+  via `llamadart_native_backends` is a Phase 5 packaging call.
+- Like #13's hook, this one **downloads at build time**. Same conclusion: it does
+  not breach the offline rule, which governs runtime, but a reproducible offline
+  build needs a mirror. Now two hooks need that in Phase 5, not one.
+
+**Verified on device.** `integration_test/llm_generation_test.dart` runs the
+unsubstituted chain on Windows — manifest → selector → integrity check → llama.cpp
+→ streamed tokens — with the real Qwen2.5-0.5B-Instruct Q4_K_M weights. All four
+cases pass. Three findings worth keeping:
+
+- **The session's transcript works.** Told "My name is Dana", then asked "What is
+  my name?" in a second turn, the model answers *Dana*. That is the whole of
+  §5.1's session contract passing end to end: the reply and its `assistantSuffix`
+  are folded back into the transcript, and `reusePromptPrefix` matches it against
+  the KV cache. The second turn cost **373 ms against the first turn's 9 188 ms**
+  — a factor of 25, which is the cache being hit rather than the conversation
+  being re-ingested. Had either half been wrong, this test would answer with a
+  guess and every turn would cost the first turn's price.
+- **Cancellation reaches the decode loop**, not merely the stream. Verified
+  against the real engine: after cancelling, token production stops.
+- **First-token latency is 6.1 s, and that is the open number.** A ~2.2 KB system
+  prompt prefilled on CPU, in a debug build, for a 0.5B model. It is not a defect
+  — it is the first real measurement §8's "first-token latency per tier" has to
+  be set from, and it will be worse on Android. **Open for Phase 5: measure in
+  release, on a physical arm64 device, and decide the tiers.** The obvious levers
+  if it needs them are GPU offload (`ggml-vulkan` is already shipped) and
+  shortening the system prompt.
+
+**Still outstanding.** Android has not been run — the same test is written to run
+there unchanged, and #13's note that the arm64 SQLCipher binary is built but
+never executed now applies to llama.cpp as well.
+
+---
+
+## #20 — The tokenizer stays synchronous, and is calibrated against the model
+
+**Status:** Accepted — refines the Phase 3.1 promise in #16 and `tokenizer.dart`
+
+**Decision.** `Tokenizer.count` remains **synchronous**. Phase 3 does not replace
+it with llama.cpp's tokenizer directly; it introduces `CalibratedTokenizer`,
+which uses the engine's real tokenizer **once, at model load**, to measure that
+model's characters-per-token, and then counts synchronously against the measured
+ratio. The measurement takes the **worst** ratio across the samples, shades it
+further by a 10% margin, and is never allowed above the old constant of 3.5.
+Failure to calibrate falls back to that constant.
+
+**Rationale.** Three sentences in the codebase promised that Phase 3.1 would swap
+in "the engine's own tokenizer". Attempting it revealed why that promise could
+not be kept literally: llama.cpp's tokenizer is reachable only **asynchronously**
+(llamadart runs it on a worker isolate), while `count` is synchronous — and
+`DefaultPromptBuilder._fit` calls it **once per message** while deciding what
+fits. An async tokenizer therefore means one isolate round-trip per message on
+every single turn, to answer a question whose useful precision is only "does this
+still fit". Making the whole prompt layer async to buy that would slow every turn
+in proportion to the length of the conversation, which is the exact cost #17's
+session design exists to avoid.
+
+Calibration keeps what the exact tokenizer was actually wanted for. The old
+constant was English prose's average, not the loaded model's — and §10's Hebrew
+gap is where that bites: Hebrew runs closer to two characters per token on a Qwen
+vocabulary, where 3.5 would under-count by nearly half. §8 makes exceeding the
+budget a **defect**, because the engine's response is to silently drop the front
+of the prompt, which is the system prompt and with it the assistant's stated
+limits. So the two directions of error are not symmetric, and every rule above —
+worst-case not mean, an added margin, a hard ceiling at 3.5 — exists to keep the
+error on the side that merely drops one old turn too many.
+
+**Rejected alternatives.**
+
+- *Make `Tokenizer` async and use llama.cpp's count directly* — exact, and what
+  the earlier comments promised. Rejected on the per-message isolate round-trips
+  above. Worth revisiting only if the fitting loop is restructured to tokenize
+  each message once and cache by message id, which is possible — messages are
+  immutable and carry a UUID — but is a change to #17's fitting function, not to
+  the tokenizer.
+- *Keep `HeuristicTokenizer` unchanged and simply document that the promise was
+  dropped* — honest and free. Rejected because the Hebrew case is a real
+  under-count on a model the registry is explicitly designed to accept, and
+  because measuring it costs one call at load.
+- *Calibrate on a built-in corpus rather than the system prompt* — more
+  representative of arbitrary chat. Rejected as speculative: the system prompt is
+  the one long text we know for certain the model will be shown, and it is
+  already loaded at that point.
+- *Fail the model load when calibration fails* — louder. Rejected: the fallback
+  is the estimate Phase 2 shipped and is safe by construction, so refusing to
+  start a chat over it trades a working conversation for a slightly better
+  constant.
+
+**Consequence.** `Prompt.estimatedTokens` stays honestly named — it is still an
+estimate, now a model-specific one. `HeuristicTokenizer` is superseded by
+`CalibratedTokenizer.uncalibrated()`, which holds the identical formula and
+constant, so nothing that depended on the old behaviour changed. The three
+comments promising a direct swap in `tokenizer.dart`, `heuristic_tokenizer.dart`
+and `prompt.dart` are corrected to point here.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

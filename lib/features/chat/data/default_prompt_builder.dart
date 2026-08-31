@@ -53,7 +53,7 @@ class DefaultPromptBuilder implements PromptBuilder {
     }
     buffer.write(template.assistantCue);
 
-    return _prompt(buffer.toString(), model);
+    return _prompt(buffer.toString(), model, template);
   }
 
   @override
@@ -63,7 +63,7 @@ class DefaultPromptBuilder implements PromptBuilder {
     // re-sending them would defeat the KV cache the session exists for (§5.1).
     final text = template.turn(userMessage.role, userMessage.text) +
         template.assistantCue;
-    return _prompt(text, model);
+    return _prompt(text, model, template);
   }
 
   @override
@@ -79,10 +79,15 @@ class DefaultPromptBuilder implements PromptBuilder {
         ChatTemplate.forFamily(model.family),
       ).overflow;
 
-  Prompt _prompt(String text, ModelDescriptor model) => Prompt(
+  Prompt _prompt(String text, ModelDescriptor model, ChatTemplate template) =>
+      Prompt(
         text: text,
         stopTokens: model.stopTokens,
         estimatedTokens: tokenizer.count(text),
+        // Carried, not interpreted: the session appends it after each reply so
+        // the transcript it replays stays a well-formed conversation. See
+        // `Prompt.assistantSuffix`.
+        assistantSuffix: template.assistantSuffix,
       );
 
   /// Divides [history] into what fits and what has to be summarised.

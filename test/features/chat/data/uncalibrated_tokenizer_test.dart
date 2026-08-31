@@ -1,11 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lev/features/chat/data/heuristic_tokenizer.dart';
+import 'package:lev/features/chat/data/calibrated_tokenizer.dart';
 
-/// The heuristic's job is not accuracy — it is a safe direction of error.
-/// §8 makes exceeding the context budget a defect, so under-counting is the
-/// failure that matters and over-counting is the price paid to avoid it.
+/// The uncalibrated estimate's job is not accuracy — it is a safe direction of
+/// error. §8 makes exceeding the context budget a defect, so under-counting is
+/// the failure that matters and over-counting is the price paid to avoid it.
+///
+/// This is what `CalibratedTokenizer` falls back to before a model is loaded and
+/// whenever calibration cannot run (technical-decisions #20), so these
+/// properties have to hold with no engine anywhere near it. It was
+/// `HeuristicTokenizer` in Phase 2; the class was folded in rather than kept
+/// alongside, because two copies of one formula only stay in agreement until
+/// somebody edits one.
 void main() {
-  const tokenizer = HeuristicTokenizer();
+  const tokenizer = CalibratedTokenizer.uncalibrated();
 
   test('empty text costs nothing', () {
     expect(tokenizer.count(''), 0);

@@ -30,6 +30,17 @@ dependencies:
   cryptography_plus: ^3.0.0
   flutter_secure_storage: ^11.0.0
 
+  # Local llama.cpp inference (technical-spec Section 5.2, technical-decisions
+  # #19). Native binaries arrive through Dart build hooks, exactly as SQLCipher
+  # does below — no C++ toolchain, no per-platform plugin wiring.
+  llamadart: ^0.8.20
+  # Streaming SHA-256 for the model integrity check (technical-spec Section 7.5).
+  # Direct, not transitive: `cryptography_plus` (used for key wrapping) buffers
+  # the whole input before hashing, which would cost as much RAM as the model.
+  crypto: ^3.0.7
+  # Reading device RAM through FFI, for the min-spec gate (Section 8).
+  ffi: ^2.2.0
+
   # Encrypted local database (technical-spec Section 5.5, technical-decisions #4).
   drift: ^2.34.3
   # Direct: the storage layer runs SQLCipher pragmas against it (see `hooks`).
@@ -62,6 +73,13 @@ hooks:
   user_defines:
     sqlite3:
       source: sqlcipher
+    # llama.cpp only. llamadart also ships a LiteRT-LM runtime and a WebGPU
+    # (Dawn) stack, which together add roughly 90 MB of native libraries per
+    # desktop build for code LEV never calls — technical-spec Section 3 names
+    # llama.cpp as the engine, and Section 8 makes install size a budget rather
+    # than an afterthought. See technical-decisions #19.
+    llamadart:
+      llamadart_native_runtimes: llama_cpp
 
 flutter:
   uses-material-design: true
