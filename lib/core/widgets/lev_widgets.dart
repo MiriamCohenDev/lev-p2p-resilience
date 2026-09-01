@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../support/support_resources.dart';
 import '../theme/app_theme.dart';
+import 'lev_mark.dart';
+
+// Re-exported so a screen that imports the component library gets the mark with
+// it. There is one heart in this product and it comes from one place.
+export 'lev_mark.dart';
 
 /// LEV's component library.
 ///
@@ -262,7 +267,7 @@ class LevWordmark extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.favorite_border, size: 19, color: c.primary),
+        LevMark(size: 21, color: c.primary),
         const SizedBox(width: LevSpace.sm),
         Text(
           label,
@@ -664,8 +669,8 @@ class LevSupportCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsetsDirectional.only(top: 3),
-                child: Icon(Icons.favorite_border, size: 19, color: c.warm),
+                padding: const EdgeInsetsDirectional.only(top: 2),
+                child: LevMark(size: 21, color: c.warm),
               ),
               const SizedBox(width: LevSpace.sm + 1),
               Expanded(

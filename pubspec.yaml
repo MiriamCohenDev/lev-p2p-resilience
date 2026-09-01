@@ -47,6 +47,11 @@ dependencies:
   # safety layer offers.
   url_launcher: ^6.3.2
 
+  # Renders the LEV mark from its own SVG (technical-decisions #27), so the
+  # design's file stays the single source of truth for the logo instead of a
+  # path transcribed into Dart. Pure Dart, no network, no native code.
+  flutter_svg: ^2.2.1
+
   # Encrypted local database (technical-spec Section 5.5, technical-decisions #4).
   drift: ^2.34.3
   # Direct: the storage layer runs SQLCipher pragmas against it (see `hooks`).
@@ -104,6 +109,11 @@ flutter:
     # one: a number that has gone stale is worse than a message that never
     # appeared, and it must be fixable without a rebuild.
     - assets/support/
+    # The LEV mark, in the two geometries the logo pack ships: a regular one and
+    # a heavier `micro` for small sizes. Copied verbatim from the design's
+    # `lev-logo/svg/`, and the only source of truth for the logo in the app
+    # (technical-decisions #27).
+    - assets/branding/
 
   # Bundled, never downloaded: `google_fonts` fetches from the network on first
   # run, which §8 makes a defect rather than a trade-off (technical-decisions

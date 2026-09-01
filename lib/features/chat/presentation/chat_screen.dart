@@ -201,10 +201,8 @@ class _ModelPreparing extends StatelessWidget {
                   color: c.primary,
                   borderRadius: LevRadius.bubbleAll,
                 ),
-                child: Icon(
-                  Icons.favorite_border,
-                  color: c.onPrimary,
-                  size: 26,
+                child: Center(
+                  child: LevMark(size: 30, color: c.onPrimary),
                 ),
               ),
               const SizedBox(height: LevSpace.lg),

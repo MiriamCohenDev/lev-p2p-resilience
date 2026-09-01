@@ -1159,6 +1159,70 @@ committed, so unlike those hooks this one does not need a mirror in Phase 5.
 
 ---
 
+## #27 — The mark is rendered from the design's SVG, by `flutter_svg`
+
+**Status:** Accepted
+
+**Decision.** `lev-mark.svg` and `lev-mark-micro.svg` are copied verbatim from
+the design's `lev-logo/svg/` into `assets/branding/`, and `LevMark` renders them
+with `flutter_svg`, tinted by a `ColorFilter` in `srcIn`. Below 24 logical pixels
+it switches to the `micro` file. **`Icons.favorite_border` is not used anywhere**,
+and a test under `test/core/widgets/lev_mark_test.dart` fails the build if it
+comes back.
+
+**Rationale.**
+
+*On not using Material's heart.* The logo is an **open** heart — two separate
+strokes that stop short of meeting, at the top of the cleft and again at the
+point. `Icons.favorite_border` is a single closed outline. It is near enough to
+pass a glance and wrong enough to notice beside the launcher icon, which is
+exactly how it survived the first pass of the design work.
+
+*On the SVG being the source of truth.* This started as a `CustomPainter` with
+the SVG's four cubic segments transcribed into Dart. It rendered identically and
+cost no dependency, and it was still the wrong shape of solution: it duplicates
+the designer's geometry into code, so redrawing the logo means someone
+re-transcribing two `d` attributes correctly and noticing that they have to.
+Nothing would fail if they did not. With the asset, replacing the logo is
+replacing a file.
+
+*On not using the pack's PNGs.* A tinted PNG is a real option —
+`BlendMode.srcIn` over a silhouette does work, so the "a PNG cannot be recoloured"
+claim made while writing the painter was wrong. Two things decide against it
+anyway. The mark is drawn at 21, 28, 30, 34 and 44 logical pixels, and a 512-pixel
+raster scaled to 21 is visibly softer than a vector at the size the wordmark
+actually uses. And the pack ships **two geometries**, not one image at two sizes:
+the `micro` file carries a heavier stroke because at 20 pixels the regular 3.4
+stroke thins out until the mark reads as a smudge. That is a design decision the
+PNGs cannot express.
+
+*On the dependency.* `flutter_svg` is pure Dart with no platform channel and no
+native build step, and it reads a bundled asset — no network, so §8 is untouched.
+It is an addition to the stack rather than a substitution, recorded here for the
+same reason `url_launcher` is (#25).
+
+**Rejected alternatives.**
+
+- *A `CustomPainter` with the paths transcribed* — no dependency, vector-sharp,
+  freely colourable. It was built and then replaced, on the duplication argument
+  above. Worth reaching for again only if `flutter_svg` becomes unmaintained.
+- *`Image.asset` with a `color` filter over `mark-turquoise-512.png`* — the
+  simplest option and no dependency at all. Rejected on the raster softness at
+  21 pixels and on the missing `micro` geometry.
+- *Shipping the pack's pre-coloured PNGs as they are* — no filter needed.
+  Rejected outright: the mark appears in four colours (turquoise light, turquoise
+  dark, white, amber) and the pack has two.
+- *Pre-compiling the SVGs to `.vec` with `vector_graphics_compiler`* — faster
+  first paint. Rejected as premature for two files of about 550 bytes, and it
+  would reintroduce a generated artifact between the design's file and the app.
+
+**Consequence — the test suite got slower.** `SvgPicture.asset` does real
+asynchronous asset loading, and every widget test that pumps a screen now waits
+for it: the suite went from roughly 27 seconds to roughly 77. Accepted, but it is
+the one thing the painter was better at.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

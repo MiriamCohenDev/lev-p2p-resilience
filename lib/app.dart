@@ -94,9 +94,7 @@ class _Splash extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = levColors(context);
     return Scaffold(
-      body: Center(
-        child: Icon(Icons.favorite_border, size: 40, color: c.primary),
-      ),
+      body: Center(child: LevMark(size: 44, color: c.primary)),
     );
   }
 }

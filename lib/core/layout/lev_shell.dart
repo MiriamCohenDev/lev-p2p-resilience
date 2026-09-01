@@ -157,11 +157,7 @@ class LevShell extends StatelessWidget {
                           top: LevSpace.lg,
                           bottom: LevSpace.md,
                         ),
-                        child: Icon(
-                          Icons.favorite_border,
-                          size: 26,
-                          color: c.primary,
-                        ),
+                        child: LevMark(size: 28, color: c.primary),
                       ),
                       destinations: [
                         for (final d in LevDestination.values)

@@ -53,10 +53,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                         color: c.primary,
                         borderRadius: LevRadius.bubbleAll,
                       ),
-                      child: Icon(
-                        Icons.favorite_border,
-                        color: c.onPrimary,
-                        size: 30,
+                      child: Center(
+                        child: LevMark(size: 34, color: c.onPrimary),
                       ),
                     ),
                   ),
