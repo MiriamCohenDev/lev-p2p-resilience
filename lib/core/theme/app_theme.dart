@@ -207,6 +207,20 @@ class LevColors extends ThemeExtension<LevColors> {
   }
 }
 
+/// LEV's colour tokens out of the ambient theme.
+///
+/// Lives beside the tokens rather than in the widget library so that anything
+/// needing a colour can reach it without pulling in every component — `LevLogo`
+/// is the case that forced it, since a logo importing the whole component
+/// library to find one accessor would be a cycle waiting to happen.
+LevColors levColors(BuildContext context) =>
+    Theme.of(context).extension<LevColors>()!;
+
+/// Whether the platform asked for reduced animation. Every animated component
+/// honours it.
+bool reduceMotion(BuildContext context) =>
+    MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
 /// The single destructive red, and the only red in the product.
 ///
 /// It appears on exactly one control: the confirm button of "delete all data".

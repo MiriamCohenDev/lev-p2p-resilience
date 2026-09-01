@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lev/core/l10n/app_localizations.dart';
 import 'package:lev/core/theme/app_theme.dart';
+import 'package:lev/core/widgets/lev_logo.dart';
 import 'package:lev/features/chat/presentation/chat_screen.dart';
+import 'package:lev/features/home/presentation/home_screen.dart';
 
 import '../../support/chat_harness.dart';
 
@@ -61,6 +63,37 @@ void main() {
     // desktop with no way into Settings, and nothing failed.
     final l10n = await AppLocalizations.delegate.load(const Locale('en'));
     expect(find.byTooltip(l10n.settingsTitle), findsOneWidget);
+  });
+
+  group('the bar carries the logo only where the rail cannot', () {
+    chatWidgetTest('below the breakpoint Home shows the mark',
+        (tester, harness) async {
+      sized(tester, const Size(420, 900));
+
+      await harness.pump(tester, const HomeScreen());
+
+      // No rail here, so the bar is the only place the product appears at all.
+      expect(find.byType(LevLogo), findsOneWidget);
+
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+      // Once — the bottom navigation's label, not a bar title.
+      expect(find.text(l10n.navHome), findsOneWidget);
+    });
+
+    chatWidgetTest('above it the bar names the destination instead',
+        (tester, harness) async {
+      sized(tester, const Size(1200, 900));
+
+      await harness.pump(tester, const HomeScreen());
+
+      // Still one logo — the rail's. Two of them side by side is what this
+      // avoids.
+      expect(find.byType(LevLogo), findsOneWidget);
+
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+      // Twice: the rail's destination label, and now the bar's title.
+      expect(find.text(l10n.navHome), findsNWidgets(2));
+    });
   });
 
   testWidgets('the breakpoint itself is read from the tokens', (tester) async {

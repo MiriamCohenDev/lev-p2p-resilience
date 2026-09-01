@@ -195,14 +195,14 @@ class _ModelPreparing extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   color: c.primary,
                   borderRadius: LevRadius.bubbleAll,
                 ),
-                child: Center(
-                  child: LevMark(size: 30, color: c.onPrimary),
+                child: const Center(
+                  child: LevLogo.mark(height: 32, onColor: true),
                 ),
               ),
               const SizedBox(height: LevSpace.lg),

@@ -286,7 +286,7 @@ Future<_Option<T>?> _pick<T>(
                 onTap: () => Navigator.of(context).pop(option),
                 trailing: option.value == current
                     ? Icon(Icons.check, size: 18, color: c.primary)
-                    : const SizedBox(width: 18),
+                    : const SizedBox(width: LevSpace.lg),
               ),
           ],
         ),

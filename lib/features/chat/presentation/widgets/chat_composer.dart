@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/lev_widgets.dart';
 
 /// The message field and its send / stop button.
 ///

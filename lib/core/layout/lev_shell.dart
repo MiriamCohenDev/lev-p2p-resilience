@@ -157,7 +157,7 @@ class LevShell extends StatelessWidget {
                           top: LevSpace.lg,
                           bottom: LevSpace.md,
                         ),
-                        child: LevMark(size: 28, color: c.primary),
+                        child: const LevLogo.mark(),
                       ),
                       destinations: [
                         for (final d in LevDestination.values)

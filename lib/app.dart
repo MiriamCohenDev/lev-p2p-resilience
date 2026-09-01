@@ -83,19 +83,18 @@ class _FirstRunGate extends StatelessWidget {
   }
 }
 
-/// The mark on the canvas colour while storage opens.
+/// The logo on the canvas colour while storage opens.
 ///
 /// Deliberately not a spinner: unlocking the database is milliseconds in the
 /// ordinary case, and a spinner that appears and vanishes reads as a stutter.
+/// The stacked lockup, because a splash is one of the two places the product
+/// introduces itself by name.
 class _Splash extends StatelessWidget {
   const _Splash();
 
   @override
   Widget build(BuildContext context) {
-    final c = levColors(context);
-    return Scaffold(
-      body: Center(child: LevMark(size: 44, color: c.primary)),
-    );
+    return const Scaffold(body: Center(child: LevLogo.vertical()));
   }
 }
 

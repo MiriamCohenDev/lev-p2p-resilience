@@ -45,29 +45,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: c.primary,
-                        borderRadius: LevRadius.bubbleAll,
-                      ),
-                      child: Center(
-                        child: LevMark(size: 34, color: c.onPrimary),
-                      ),
-                    ),
-                  ),
+                  // The stacked lockup, on the canvas — no coloured panel behind
+                  // it. This and the splash are the only two places the product
+                  // says its own name.
+                  const Center(child: LevLogo.vertical()),
                   const SizedBox(height: LevSpace.lg),
-                  Text(
-                    l10n.appTitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: LevSpace.sm),
                   Text(
                     l10n.welcomeTagline,
                     textAlign: TextAlign.center,

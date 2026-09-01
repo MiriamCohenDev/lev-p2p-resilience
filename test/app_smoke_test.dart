@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lev/core/l10n/app_localizations.dart';
+import 'package:lev/core/widgets/lev_logo.dart';
 import 'package:lev/features/home/presentation/home_screen.dart';
 import 'package:lev/features/onboarding/presentation/welcome_screen.dart';
 
@@ -21,6 +22,12 @@ void main() {
     // The warning is in the body of the card, at the same size as the rest, and
     // before the decision — not in small print.
     expect(find.text(l10n.welcomeLockWarning), findsOneWidget);
+
+    // The one screen that introduces the product by name: the stacked lockup,
+    // wordmark and all.
+    final logo = tester.widget<LevLogo>(find.byType(LevLogo));
+    expect(logo.variant, LevLogoVariant.vertical);
+    expect(find.text('LEV'), findsOneWidget);
   });
 
   chatWidgetTest('accepting the welcome screen opens Home, and it stays open',
@@ -44,12 +51,20 @@ void main() {
     expect(find.byType(WelcomeScreen), findsNothing);
   });
 
-  chatWidgetTest('Home greets, offers one action, and names the app',
+  chatWidgetTest('Home greets and offers one action, under the mark alone',
       (tester, harness) async {
     await harness.pumpApp(tester);
 
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text(l10n.appTitle), findsOneWidget);
     expect(find.text(l10n.homeStartChat), findsOneWidget);
+
+    // The bar carries the symbol and **not** the word. `appTitle` still exists,
+    // but only as the window and task-switcher name — it is no longer a source
+    // of text on any screen.
+    expect(
+      tester.widget<LevLogo>(find.byType(LevLogo)).variant,
+      LevLogoVariant.mark,
+    );
+    expect(find.text('LEV'), findsNothing);
   });
 }

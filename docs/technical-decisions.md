@@ -1161,7 +1161,7 @@ committed, so unlike those hooks this one does not need a mirror in Phase 5.
 
 ## #27 — The mark is rendered from the design's SVG, by `flutter_svg`
 
-**Status:** Accepted
+**Status:** Accepted — `LevMark` itself **superseded by #28**, which folds it into `LevLogo`
 
 **Decision.** `lev-mark.svg` and `lev-mark-micro.svg` are copied verbatim from
 the design's `lev-logo/svg/` into `assets/branding/`, and `LevMark` renders them
@@ -1220,6 +1220,118 @@ same reason `url_launcher` is (#25).
 asynchronous asset loading, and every widget test that pumps a screen now waits
 for it: the suite went from roughly 27 seconds to roughly 77. Accepted, but it is
 the one thing the painter was better at.
+
+---
+
+## #28 — One logo widget, three lockups, and a font that draws three letters
+
+**Status:** Accepted — completes #27, which covered only the symbol
+
+**Decision.** The logo is `LevLogo`, with three variants whose every measurement
+derives from a single `height`:
+
+| variant      | what it is          | where it is allowed                       |
+|--------------|---------------------|-------------------------------------------|
+| `mark`       | the symbol alone    | the bars and the side rail                |
+| `vertical`   | symbol above word   | the first-run screen and the splash       |
+| `horizontal` | symbol beside word  | outside the application only              |
+
+**In the application's bars the wordmark does not appear** — only the symbol.
+The word is set in `OutfitSemiBold`, subset to A–Z at one weight (3.3 KB), which
+is used for this and for nothing else. `LevMark` and `LevWordmark` are deleted.
+
+**Rationale.**
+
+*On the bars carrying no word.* This is the design's rule and it is the right
+one: a name printed on every screen stops being read within a day, and the bar's
+job is to say where you are, which "LEV" never does. The first pass of this work
+put a hand-assembled `LevMark` + `Text('LEV')` lockup in the home bar — wrong in
+both halves, and wrong in the direction that is hardest to notice, because it
+looks deliberate.
+
+*On the word having a font of its own.* The wordmark is part of the logo, not
+copy, and setting it in the interface face makes it a heading that happens to say
+the product's name. The subset is what makes this cheap rather than indulgent:
+three letters, one weight, 3.3 KB — less than 1% of what the five interface
+weights cost. It is also self-policing, since any other text set in it would
+render as blanks.
+
+*On no image file of the lockup.* Composing it from the symbol and the font means
+it is sharp at any size, recolours with the theme, and — the part that matters —
+cannot drift out of step with either half. A PNG of the lockup would be a third
+artifact to keep in sync with the two that already define it.
+
+*On the ratios being fixed in the widget.* `vertical` sets the word at half the
+mark and `horizontal` at 0.85 of it. Leaving those to call sites is how a logo
+ends up with six slightly different proportions across one application.
+
+**Rejected alternatives.**
+
+- *Keep the mark-plus-word lockup in the bar* — it is a brand surface and it did
+  look deliberate. Rejected on the design's explicit rule, and on the reading
+  above.
+- *Ship the wordmark as an SVG path like the symbol* — one fewer font, and no
+  font loading at all. Rejected: the letterforms would then be frozen at whatever
+  outline was exported, and the word could no longer follow text scaling or be
+  read by anything but the eye. The font is also smaller than the outlines.
+- *The full Outfit family instead of a subset* — one less build step for whoever
+  updates it. Rejected at roughly 50× the size for characters nothing renders.
+- *Route `'LEV'` through the ARB files like every other string* — consistent with
+  #11. Rejected: it is a brand name, identical in every locale, and a logo that
+  cannot draw itself without `AppLocalizations` has a dependency it has no
+  business having. It stays a literal inside `lev_logo.dart` and nowhere else,
+  which a static test enforces.
+
+**Consequence — four static guards, and one deliberate omission.**
+
+`test/core/widgets/lev_logo_test.dart` fails the build on `Icons.favorite`, on
+`Text('LEV')`, on any reach into `assets/branding/`, and on any use of
+`OutfitSemiBold` outside `lev_logo.dart`. Each of those is a way the logo has
+already gone wrong once or could plausibly go wrong again.
+
+The omission is the safety layer's support card, which **lost its icon
+entirely**. The design draws a Material heart there, and that is not available:
+the logo is never painted amber, and a Material heart beside the logo's heart
+puts two heart shapes in one application. Any other glyph would compete with what
+the card is saying. The card is distinct enough without one — an amber ground, a
+bolder title, a filled call button — and without it, it reads as a person
+reaching out rather than as a system alert, which is what it has to be.
+
+---
+
+## #29 — The design package's screenshots are reference material, not an asset
+
+**Status:** Accepted
+
+**Decision.** `docs/design/` — the design system's README and all twenty screen
+captures — is committed and is the reference to consult before building a screen,
+as CLAUDE.md's design chapter now requires. It is **not** declared under
+`flutter: assets:` in `pubspec.yaml`, though the package's own instructions ask
+for that. `tool/check_design.sh` is committed and runs after every UI change.
+
+**Rationale.** Declaring `docs/design/screens/` as a Flutter asset would put about
+a megabyte of PNGs inside every APK and every desktop bundle, for images no line
+of code loads. §8 makes install size a budget, and this is a build artifact for
+developers, not product data.
+
+**Rejected alternatives.**
+
+- *Follow the instruction and declare them* — the package asked. Rejected on the
+  size argument; the instruction was written for a project without an install-size
+  constraint in its spec.
+- *Keep the screenshots outside the repository* — no weight at all. Rejected: the
+  rule "look at the screen's image before building it" is worthless if the images
+  live in someone's Downloads folder, and reviewing a UI change against them is
+  exactly when they need to be at a stable path.
+
+**Consequence — two of the twenty are known to be wrong.**
+`04-home-desktop.png` and `07-chat-desktop.png` show the navigation rail on the
+**left** in Hebrew. That is a rendering artifact of the mockup, not a design
+decision: the rail belongs on the start side, which is the right in Hebrew, and
+`LevShell` already builds it that way — the rail is the first child of the `Row`,
+so RTL places it correctly with no branch. **Read nothing about column order from
+those two files.** A corrected package is expected; when it lands, they and
+`lev_shell.dart` should be re-checked together.
 
 ---
 

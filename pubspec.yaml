@@ -132,3 +132,10 @@ flutter:
           weight: 600
         - asset: assets/fonts/IBMPlexSansHebrew-Bold.ttf
           weight: 700
+    # The logo's wordmark, and **nothing else** (technical-decisions #28).
+    # Subset to A–Z at one weight, which is why it is 3.3 KB: it renders exactly
+    # three letters. The interface is IBM Plex Sans Hebrew throughout.
+    - family: OutfitSemiBold
+      fonts:
+        - asset: assets/fonts/Outfit-SemiBold-Subset.ttf
+          weight: 600

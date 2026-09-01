@@ -29,7 +29,14 @@ class HomeScreen extends ConsumerWidget {
     return LevShell(
       destination: LevDestination.home,
       onDestinationChanged: (d) => goToDestination(context, d),
-      title: LevWordmark(label: l10n.appTitle),
+      // The mark carries the bar on mobile, where there is no rail to hold it —
+      // and the mark alone, never the word (see `LevLogo`). On desktop the rail
+      // is already showing it, so a second one in the bar beside it would be two
+      // logos side by side; the bar takes the destination's name instead, which
+      // is what every other desktop bar here does.
+      title: LevBreakpoint.isWide(context)
+          ? Text(l10n.navHome)
+          : const LevLogo.mark(),
       onOpenSettings: () => context.push(AppRoutes.settings),
       body: SafeArea(
         child: SingleChildScrollView(

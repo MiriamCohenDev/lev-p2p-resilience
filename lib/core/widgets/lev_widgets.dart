@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../support/support_resources.dart';
 import '../theme/app_theme.dart';
-import 'lev_mark.dart';
-
-// Re-exported so a screen that imports the component library gets the mark with
-// it. There is one heart in this product and it comes from one place.
-export 'lev_mark.dart';
+// Re-exported so a screen that imports the component library gets the logo with
+// it. There is one logo in this product and it comes from one place.
+export 'lev_logo.dart';
 
 /// LEV's component library.
 ///
@@ -25,14 +23,8 @@ export 'lev_mark.dart';
 /// filled from `AppLocalizations` by the screen, because #11 makes a literal in
 /// a widget a defect.
 
-/// LEV's colour tokens out of the ambient theme.
-LevColors levColors(BuildContext context) =>
-    Theme.of(context).extension<LevColors>()!;
-
-/// Whether the platform asked for reduced animation. Every animated component
-/// here honours it.
-bool reduceMotion(BuildContext context) =>
-    MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+// `levColors` and `reduceMotion` live in `app_theme.dart`, beside the tokens
+// they read, and arrive here with it.
 
 // ═══════════════════════════════════════════════════════════════════════
 // Buttons
@@ -251,35 +243,10 @@ class LevCard extends StatelessWidget {
   }
 }
 
-/// The wordmark with its heart, as the bar shows it.
-///
-/// The mark sits on the start side — the right, in Hebrew — so it leads the
-/// name rather than trailing it.
-class LevWordmark extends StatelessWidget {
-  const LevWordmark({super.key, required this.label});
-
-  /// `appTitle`. Latin in both locales: it is a wordmark, not a translated noun.
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = levColors(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        LevMark(size: 21, color: c.primary),
-        const SizedBox(width: LevSpace.sm),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-        ),
-      ],
-    );
-  }
-}
+// The bar's logo was a `LevWordmark` here — the mark beside the word `LEV`, set
+// in the interface font. Both halves of that were wrong: the design's bars carry
+// the mark alone, and the word has a font of its own. It is `LevLogo` now, and
+// this is the only place the logo comes from.
 
 /// The small uppercase-weight label above a group of cards or settings rows.
 class LevSectionLabel extends StatelessWidget {
@@ -665,34 +632,24 @@ class LevSupportCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsetsDirectional.only(top: 2),
-                child: LevMark(size: 21, color: c.warm),
-              ),
-              const SizedBox(width: LevSpace.sm + 1),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      resource.title,
-                      style: text.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: c.warmInk,
-                      ),
-                    ),
-                    const SizedBox(height: LevSpace.xs / 2),
-                    Text(
-                      resource.body,
-                      style: text.bodyMedium?.copyWith(color: c.warmInk),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          // **No icon.** The logo is not painted amber and is reserved for the
+          // bars, a Material heart beside the logo's heart would put two heart
+          // shapes in one application, and any other glyph would compete with
+          // what the card is saying. The card is distinct enough without one —
+          // an amber ground, a bolder title, a filled call button — and without
+          // it, it reads as a person reaching out rather than as a system alert,
+          // which is exactly what it has to be.
+          Text(
+            resource.title,
+            style: text.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: c.warmInk,
+            ),
+          ),
+          const SizedBox(height: LevSpace.xs / 2),
+          Text(
+            resource.body,
+            style: text.bodyMedium?.copyWith(color: c.warmInk),
           ),
           const SizedBox(height: LevSpace.md),
           Semantics(

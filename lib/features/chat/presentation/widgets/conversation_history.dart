@@ -160,14 +160,35 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
       builder: (context) => AlertDialog(
         title: Text(l10n.conversationDeleteTitle),
         content: Text(l10n.conversationDeleteBody),
+        actionsPadding: const EdgeInsetsDirectional.fromSTEB(
+          LevSpace.lg,
+          0,
+          LevSpace.lg,
+          LevSpace.lg,
+        ),
+        // `LevButton`, not Material's `TextButton`: every button in the product
+        // comes from the component library. One `Row` rather than two entries,
+        // because `AlertDialog.actions` is an `OverflowBar` and gives its
+        // children no incoming width for `Expanded` to take.
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.conversationDelete),
+          Row(
+            children: [
+              Expanded(
+                child: LevButton(
+                  label: l10n.cancel,
+                  kind: LevButtonKind.secondary,
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ),
+              const SizedBox(width: LevSpace.md),
+              Expanded(
+                child: LevButton(
+                  label: l10n.conversationDelete,
+                  kind: LevButtonKind.secondary,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+            ],
           ),
         ],
       ),
