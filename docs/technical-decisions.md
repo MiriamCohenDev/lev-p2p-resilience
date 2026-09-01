@@ -1335,6 +1335,93 @@ those two files.** A corrected package is expected; when it lands, they and
 
 ---
 
+## #30 — A conversation row answers the pointer, and carries its own menu
+
+**Status:** Accepted — supersedes the affordance half of #22, and the "no rename
+action" half of `ChatRepository.updateTitle`
+
+**Decision.** A row in the conversation list changes ground under the pointer
+and under keyboard focus, using a new `LevColors.hover` role. Its actions —
+**rename** and **delete** — sit behind one menu (`showLevMenu`), and **how that
+menu is reached is the platform's own idiom**:
+
+| platform | how the menu opens |
+|---|---|
+| phone / tablet | a long press, and nothing on the row |
+| pointer | a `⋯` the row shows under the pointer or on keyboard focus, a right-click, or a long press |
+
+Where the control exists its space is held whether or not it is showing, so the
+title does not reflow under the pointer.
+
+**Rationale.**
+
+*On the hover state.* The list is a column of a dozen near-identical titles —
+several of them literally the placeholder — and until a row was selected nothing
+under the cursor said which one a click would open. This is the one question a
+list has to answer before the click, and `primarySoft` cannot answer it: hover
+and selected are different facts, and a row can be either, both, or neither. So
+`hover` is a neutral step away from `surface`, not a wash of the turquoise, and
+selected still wins where they collide.
+
+*On the actions being behind a menu rather than on the row.* A visible delete on
+every row would put a destructive action twelve times over in the quietest list
+in the product. A menu costs one click and buys a list that is not a minefield.
+
+*On the phone carrying nothing at all.* The first build showed the `⋯` always on
+touch, on the reasoning that a control no hover can reveal has to be shown to
+exist. On the emulator that came out as a stripe of twelve dots down the drawer,
+pulling the eye harder than the twelve titles beside them — the same noise the
+menu was introduced to avoid, reintroduced one platform over. Every other
+conversation list on a phone answers this with a long press, and a person
+arriving from any of them already knows the gesture. So the affordance is not
+missing on touch; it is the platform's, rather than one drawn on top of it.
+
+*On adding a rename at all.* Product-spec §5 lists no rename action, and the
+title has until now been derived from the opening message. But a derived title
+is a guess — "…I feel really bad, these" is a sentence, not a name — and the
+list is the only way back into a conversation. Renaming does not fight the
+derivation: the derived title is written only where there is none, so a name a
+person chose is never overwritten.
+
+*On the rename not being confirmed while the delete is.* Renaming is reversible
+by renaming again. Asking "are you sure?" in front of something undoable is
+exactly how a confirmation stops being read by the time it guards a deletion.
+
+*On `hover` being a new colour role.* The design package's palette did not ship
+one, and this is the first added role. It is a role and not a value — light
+steps down towards `canvas`, dark steps up past `raised`, because on a dark
+ground the eye reads lighter as nearer — so the widget carries no brightness
+branch. **The two values are ours, not the package's, and should be confirmed
+against it.**
+
+**Rejected alternatives.**
+
+- *Rely on `InkWell`'s built-in hover overlay* — no new token, no state to hold.
+  Rejected twice over: the tile's own opaque background paints over the ink, and
+  Material's default overlay is a low-opacity black rather than a LEV colour.
+- *Keep long-press as the only way to delete (#22)* — it was already built.
+  Rejected: it is invisible, it is the wrong gesture on a desktop, and it left
+  the keyboard with no route at all, which #22 recorded honestly as a gap.
+- *A visible trailing delete on each row* — one click instead of two. Rejected
+  on the reading above.
+- *Let the button appear and disappear from the layout* — no reserved space, no
+  `Visibility`. Rejected: the title would shorten and re-ellipsise the moment
+  the pointer crossed the row, which reads as the list twitching.
+- *Show the button on every platform always* — one rule instead of two.
+  Rejected on the phone reading above; it was built that way first and looked
+  wrong on the first emulator run.
+- *Keep the button on touch but make it quieter* — grey it down, tuck it beside
+  the title. Rejected: twelve of anything in a column is a column, however
+  quiet, and it would still not be what a phone user reaches for.
+
+**Consequence.** `LevColors` gains a field, so every future palette must define
+it. `showLevMenu` is now the product's only menu surface; the mutual-aid rows
+(Phase 4) should use it rather than growing one of their own. The delete flow is
+one step longer than it was — the menu, then the confirmation — which is what
+the two tests covering it now assert.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

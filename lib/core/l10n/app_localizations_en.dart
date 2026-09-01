@@ -103,6 +103,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conversationUntitled => 'Untitled conversation';
 
   @override
+  String get conversationActions => 'Conversation actions';
+
+  @override
+  String get conversationRename => 'Rename';
+
+  @override
+  String get conversationRenameTitle => 'Conversation name';
+
+  @override
+  String get conversationRenameHint => 'A name you will recognise later';
+
+  @override
+  String get conversationRenameEmpty => 'A conversation needs a name.';
+
+  @override
   String get conversationDelete => 'Delete';
 
   @override
@@ -290,6 +305,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancel => 'Cancel';
+
+  @override
+  String get save => 'Save';
 
   @override
   String get back => 'Back';

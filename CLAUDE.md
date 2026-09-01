@@ -70,7 +70,8 @@ that folder.** They are the source of truth, not this file and not the mockup PD
 2. **No spacing numbers.** Only `LevSpace` (4·8·12·16·24·32·48·64) and `LevRadius`.
 3. **No improvised widget.** Button = `LevButton`. Card = `LevCard`. Bubble =
    `LevBubble`. Empty or error state = `LevEmptyState`. Status pill =
-   `LevStatusPill`. Logo = `LevLogo`. A missing component is added to
+   `LevStatusPill`. Logo = `LevLogo`. A row's own menu = `showLevMenu`. A
+   missing component is added to
    `lib/core/widgets/lev_widgets.dart`, never improvised in the screen.
 4. **The logo only through `LevLogo`.** Never `Text('LEV')`, never a hand-placed
    `Icon`.

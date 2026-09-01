@@ -33,6 +33,7 @@ class LevColors extends ThemeExtension<LevColors> {
     required this.canvas,
     required this.surface,
     required this.raised,
+    required this.hover,
     required this.ink,
     required this.muted,
     required this.disabled,
@@ -57,6 +58,16 @@ class LevColors extends ThemeExtension<LevColors> {
 
   /// What sits on top of [surface]: chat bubbles, input fields.
   final Color raised;
+
+  /// The ground of a row the pointer is resting on, or that has keyboard focus.
+  ///
+  /// A list has to answer "which one am I about to click?" *before* the click,
+  /// and [primarySoft] cannot do it — hover and selected are two different
+  /// questions, and a row can be either, both, or neither. So this is a
+  /// neutral step away from [surface] rather than a wash of the turquoise:
+  /// down towards [canvas] in light, and *up* past [raised] in dark, because on
+  /// a dark ground the eye reads lighter as nearer.
+  final Color hover;
 
   /// Primary text.
   final Color ink;
@@ -99,6 +110,7 @@ class LevColors extends ThemeExtension<LevColors> {
     canvas: Color(0xFFF2F2EF),
     surface: Color(0xFFFBFBF9),
     raised: Color(0xFFFFFFFF),
+    hover: Color(0xFFECECE7),
     ink: Color(0xFF1D2A2E),
     muted: Color(0xFF5F6F73),
     disabled: Color(0xFFA2ADAF),
@@ -125,6 +137,7 @@ class LevColors extends ThemeExtension<LevColors> {
     canvas: Color(0xFF14181A),
     surface: Color(0xFF1C2124),
     raised: Color(0xFF232A2D),
+    hover: Color(0xFF283033),
     ink: Color(0xFFE8EAE7),
     muted: Color(0xFF9BA6A8),
     disabled: Color(0xFF5C6668),
@@ -146,6 +159,7 @@ class LevColors extends ThemeExtension<LevColors> {
     Color? canvas,
     Color? surface,
     Color? raised,
+    Color? hover,
     Color? ink,
     Color? muted,
     Color? disabled,
@@ -165,6 +179,7 @@ class LevColors extends ThemeExtension<LevColors> {
       canvas: canvas ?? this.canvas,
       surface: surface ?? this.surface,
       raised: raised ?? this.raised,
+      hover: hover ?? this.hover,
       ink: ink ?? this.ink,
       muted: muted ?? this.muted,
       disabled: disabled ?? this.disabled,
@@ -189,6 +204,7 @@ class LevColors extends ThemeExtension<LevColors> {
       canvas: Color.lerp(canvas, other.canvas, t)!,
       surface: Color.lerp(surface, other.surface, t)!,
       raised: Color.lerp(raised, other.raised, t)!,
+      hover: Color.lerp(hover, other.hover, t)!,
       ink: Color.lerp(ink, other.ink, t)!,
       muted: Color.lerp(muted, other.muted, t)!,
       disabled: Color.lerp(disabled, other.disabled, t)!,

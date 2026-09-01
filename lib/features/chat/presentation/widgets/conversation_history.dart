@@ -79,6 +79,10 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
           onSelect: (id) => context.go(AppRoutes.conversation(id)),
           onNewChat: _startConversation,
           onSearch: (value) => setState(() => _query = value),
+          // The row hands back an id; the dialog needs the conversation, because
+          // it prefills with the *stored* title and the row may be showing the
+          // "untitled" placeholder instead of one.
+          onRename: (id) => _rename(items.firstWhere((c) => c.id == id)),
           onDelete: _confirmDelete,
           onOpenSettings: widget.showSettings
               ? () => context.push(AppRoutes.settings)
@@ -145,6 +149,26 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
   String _titleOf(Conversation conversation, AppLocalizations l10n) =>
       conversation.title.isEmpty ? l10n.conversationUntitled : conversation.title;
 
+  /// Renaming, from the row's own menu.
+  ///
+  /// **Not confirmed, and correctly so.** A rename is reversible by renaming
+  /// again; asking "are you sure?" before something undoable is how a
+  /// confirmation stops being read by the time it guards a deletion.
+  ///
+  /// The title the chat derives from the opening message is only ever written
+  /// when there is none yet, so a name chosen here is never quietly overwritten
+  /// later.
+  Future<void> _rename(Conversation conversation) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _RenameDialog(initial: conversation.title),
+    );
+    if (name == null || !mounted) return;
+
+    final repository = await ref.read(chatRepositoryProvider.future);
+    await repository.updateTitle(conversation.id, name);
+  }
+
   /// Confirmed, because it is irreversible: deleting erases the messages
   /// outright rather than hiding them (technical-decisions #15), and there is no
   /// server and no backup to recover them from.
@@ -207,5 +231,98 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
     if (Scaffold.maybeOf(context)?.hasDrawer ?? false) navigator.pop();
     if (!mounted) return;
     context.go(AppRoutes.conversation(id));
+  }
+}
+
+/// The rename dialog.
+///
+/// Stateful only so the save button can be disabled while the field is empty:
+/// a conversation with no name at all is indistinguishable from every other
+/// one in the list, which is the problem renaming exists to solve. The button
+/// says *why* it is disabled rather than just sitting grey — a disabled control
+/// with no explanation is a broken screen.
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+    // Selected, not just placed: the common case is replacing the derived title
+    // outright, and typing should do that without a clearing gesture first.
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.initial.length,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _value => _controller.text.trim();
+
+  void _submit() {
+    if (_value.isEmpty) return;
+    Navigator.of(context).pop(_value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return AlertDialog(
+      title: Text(l10n.conversationRenameTitle),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: 1,
+        textInputAction: TextInputAction.done,
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _submit(),
+        decoration: InputDecoration(hintText: l10n.conversationRenameHint),
+      ),
+      actionsPadding: const EdgeInsetsDirectional.fromSTEB(
+        LevSpace.lg,
+        0,
+        LevSpace.lg,
+        LevSpace.lg,
+      ),
+      // One `Row`, for the same reason the delete dialog uses one:
+      // `AlertDialog.actions` is an `OverflowBar` and hands its children no
+      // incoming width for `Expanded` to take.
+      actions: [
+        Row(
+          children: [
+            Expanded(
+              child: LevButton(
+                label: l10n.cancel,
+                kind: LevButtonKind.secondary,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            const SizedBox(width: LevSpace.md),
+            Expanded(
+              child: LevButton(
+                label: l10n.save,
+                onPressed: _value.isEmpty ? null : _submit,
+                disabledHint: l10n.conversationRenameEmpty,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

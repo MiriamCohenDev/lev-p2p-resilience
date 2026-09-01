@@ -152,6 +152,75 @@ class LevButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// A row's own menu
+// ═══════════════════════════════════════════════════════════════════════
+
+/// One entry in a row's menu: what it looks like, what it says, what it does.
+typedef LevMenuAction = ({
+  IconData icon,
+  String label,
+  VoidCallback onSelected,
+});
+
+/// Opens the product's row menu and runs whichever action was chosen.
+///
+/// Anchored on [anchor]'s own box — pass the *button's* context, not the row's,
+/// or the menu opens from the middle of the row. [at] overrides that with a
+/// global point, which is what a right-click wants: the menu should appear
+/// under the cursor, not under a control the cursor was nowhere near.
+///
+/// It exists here rather than in the screen because a menu is a surface, and a
+/// surface improvised per screen is how a palette stops being a palette. RTL
+/// needs no handling: `showMenu` reads the ambient directionality and flips its
+/// own alignment.
+Future<void> showLevMenu({
+  required BuildContext anchor,
+  required List<LevMenuAction> actions,
+  Offset? at,
+}) async {
+  final c = levColors(anchor);
+  final text = Theme.of(anchor).textTheme;
+
+  final overlay =
+      Navigator.of(anchor).overlay!.context.findRenderObject()! as RenderBox;
+  final box = anchor.findRenderObject()! as RenderBox;
+  // `showMenu` positions within the overlay's coordinate space, so a global
+  // point from a pointer event has to be brought into it.
+  final origin = at != null
+      ? overlay.globalToLocal(at)
+      : box.localToGlobal(box.size.center(Offset.zero), ancestor: overlay);
+
+  final chosen = await showMenu<VoidCallback>(
+    context: anchor,
+    position: RelativeRect.fromRect(origin & Size.zero, Offset.zero & overlay.size),
+    color: c.surface,
+    shape: RoundedRectangleBorder(
+      borderRadius: LevRadius.cardAll,
+      side: BorderSide(color: c.line),
+    ),
+    items: [
+      for (final action in actions)
+        PopupMenuItem<VoidCallback>(
+          value: action.onSelected,
+          height: LevSpace.minTouch,
+          child: Row(
+            children: [
+              Icon(action.icon, size: 18, color: c.muted),
+              const SizedBox(width: LevSpace.md),
+              // Not the destructive red on "delete", even here. That colour is
+              // spent on erasing the whole installation and nothing else (#28),
+              // and a menu entry that shouts is a menu entry that gets misread.
+              Text(action.label, style: text.bodyLarge),
+            ],
+          ),
+        ),
+    ],
+  );
+
+  chosen?.call();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Help-request status pill
 // ═══════════════════════════════════════════════════════════════════════
 

@@ -146,9 +146,34 @@
     "description": "List entry for a conversation with no message in it yet, so it has no derived title. Deliberately different wording from conversationsNew, which is the button that creates one"
   },
 
+  "conversationActions": "Conversation actions",
+  "@conversationActions": {
+    "description": "Tooltip and screen-reader label of the button on a conversation row that opens its menu"
+  },
+
+  "conversationRename": "Rename",
+  "@conversationRename": {
+    "description": "Entry in a conversation row's menu that opens the rename dialog"
+  },
+
+  "conversationRenameTitle": "Conversation name",
+  "@conversationRenameTitle": {
+    "description": "Title of the rename dialog. A statement of what is being edited rather than a question — unlike deleting, there is nothing here to confirm"
+  },
+
+  "conversationRenameHint": "A name you will recognise later",
+  "@conversationRenameHint": {
+    "description": "Placeholder in the rename dialog's text field"
+  },
+
+  "conversationRenameEmpty": "A conversation needs a name.",
+  "@conversationRenameEmpty": {
+    "description": "Announced by a screen reader on the rename dialog's disabled save button, saying why it cannot be pressed"
+  },
+
   "conversationDelete": "Delete",
   "@conversationDelete": {
-    "description": "Action that deletes a conversation"
+    "description": "Action that deletes a conversation. Appears twice in one flow — as the menu entry that asks, and as the confirming button in the dialog that follows"
   },
 
   "conversationDeleteTitle": "Delete this conversation?",
@@ -445,6 +470,11 @@
   "cancel": "Cancel",
   "@cancel": {
     "description": "Generic action that abandons a dialog without doing anything"
+  },
+
+  "save": "Save",
+  "@save": {
+    "description": "Generic action that commits what a dialog was opened to change"
   },
 
   "back": "Back",

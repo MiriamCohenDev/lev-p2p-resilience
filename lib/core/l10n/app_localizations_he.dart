@@ -102,6 +102,21 @@ class AppLocalizationsHe extends AppLocalizations {
   String get conversationUntitled => 'שיחה ללא כותרת';
 
   @override
+  String get conversationActions => 'פעולות בשיחה';
+
+  @override
+  String get conversationRename => 'שינוי שם';
+
+  @override
+  String get conversationRenameTitle => 'שם השיחה';
+
+  @override
+  String get conversationRenameHint => 'שם שיהיה קל לזהות אחר כך';
+
+  @override
+  String get conversationRenameEmpty => 'לשיחה צריך שם.';
+
+  @override
   String get conversationDelete => 'מחיקה';
 
   @override
@@ -289,6 +304,9 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get cancel => 'ביטול';
+
+  @override
+  String get save => 'שמירה';
 
   @override
   String get back => 'חזרה';

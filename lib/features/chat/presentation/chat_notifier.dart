@@ -289,7 +289,8 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
 
   /// Names the conversation after its opening message, once.
   ///
-  /// See `ChatRepository.updateTitle`: derived, not a rename action.
+  /// See `ChatRepository.updateTitle`. The guard below is what keeps this out
+  /// of the way of a title a person chose from the row's menu.
   Future<void> _titleFrom(String firstMessage) async {
     final conversation = await _repository.findConversation(conversationId);
     if (conversation == null || conversation.title.isNotEmpty) return;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -261,6 +262,7 @@ class LevConversationList extends StatelessWidget {
     required this.onSelect,
     required this.onNewChat,
     this.onSearch,
+    this.onRename,
     this.onDelete,
     this.onOpenSettings,
   });
@@ -274,14 +276,20 @@ class LevConversationList extends StatelessWidget {
   final VoidCallback onNewChat;
   final ValueChanged<String>? onSearch;
 
-  /// Deleting a conversation, on a long press or a secondary tap.
+  /// What a row's own menu offers. Both are optional; a list given neither has
+  /// no menu at all, and its rows lose the control that opens one.
   ///
-  /// The design draws no delete control, and putting a visible one on every row
-  /// would place a destructive action in the quietest list in the product. It is
-  /// not droppable either — this is a privacy application, and being unable to
-  /// remove a conversation would be a real loss. A long press is announced by
-  /// screen readers, so the affordance is not mouse-only; a keyboard-only
-  /// desktop user is the case this does not yet reach.
+  /// The design draws no per-row controls, and a *visible* delete on every row
+  /// would put a destructive action twelve times over in the quietest list in
+  /// the product. Neither is droppable, though: this is a privacy application,
+  /// and being unable to remove a conversation would be a real loss.
+  ///
+  /// So they sit behind one menu, reached the way the platform reaches menus:
+  /// on a phone, a long press — the same gesture every other conversation list
+  /// there uses. Where there is a pointer, that plus a control the row shows
+  /// under it, a right-click, and the keyboard, which reveals the control on
+  /// focus and closes the gap left open in #22.
+  final ValueChanged<String>? onRename;
   final ValueChanged<String>? onDelete;
 
   /// Shown in the drawer only (mobile). On desktop, settings live at the bottom
@@ -351,6 +359,9 @@ class LevConversationList extends StatelessWidget {
                             // column there is nothing to close.
                             if (inDrawer) Navigator.of(context).pop();
                           },
+                          onRename: onRename == null
+                              ? null
+                              : () => onRename!(conversation.id),
                           onDelete: onDelete == null
                               ? null
                               : () => onDelete!(conversation.id),
@@ -372,45 +383,166 @@ class LevConversationList extends StatelessWidget {
   }
 }
 
-class _ConversationTile extends StatelessWidget {
+/// One conversation in the list.
+///
+/// **The row answers the pointer before it is clicked.** It used to be flat
+/// until it was selected, so on a column of a dozen near-identical titles there
+/// was no way to tell which one was about to be opened — the ground changes
+/// under the cursor now, and under keyboard focus, which is the same question
+/// asked without a mouse.
+///
+/// Its own actions live behind a menu on the row rather than as controls on it:
+/// a delete button visible on every row would put a destructive action in the
+/// quietest list in the product, twelve times over. **How the menu is reached
+/// is the platform's own idiom** — the control that appears under the pointer
+/// where there is one, a long press where there is not.
+class _ConversationTile extends StatefulWidget {
   const _ConversationTile({
     required this.title,
     required this.selected,
     required this.onTap,
+    this.onRename,
     this.onDelete,
   });
 
   final String title;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onRename;
   final VoidCallback? onDelete;
+
+  @override
+  State<_ConversationTile> createState() => _ConversationTileState();
+}
+
+class _ConversationTileState extends State<_ConversationTile> {
+  bool _pointerOn = false;
+  bool _focused = false;
+  bool _menuOpen = false;
+
+  bool get _hasMenu => widget.onRename != null || widget.onDelete != null;
+
+  /// Whether the row is the one being addressed right now — by a pointer, by
+  /// the keyboard, or by its own menu standing open over it.
+  bool get _active => _pointerOn || _focused || _menuOpen;
+
+  /// Whether this platform has a pointer that can reveal the control.
+  ///
+  /// A phone has none, so the control would have to be shown always — twelve
+  /// of them, in one column, in a drawer the width of a thumb. Tried, and the
+  /// stripe of dots pulled the eye harder than the titles it was sitting next
+  /// to. Conversation lists on phones do not carry one: a long press is the
+  /// gesture for a row's own actions, and it is the one this uses.
+  bool get _hasPointer => switch (defaultTargetPlatform) {
+        TargetPlatform.android ||
+        TargetPlatform.iOS ||
+        TargetPlatform.fuchsia =>
+          false,
+        _ => true,
+      };
+
+  Future<void> _openMenu(BuildContext anchor, {Offset? at}) async {
+    final l10n = AppLocalizations.of(context);
+
+    // Held open past the menu itself: without this the row would fall back to
+    // flat the moment the pointer left it for the menu, and the menu would be
+    // hanging off nothing.
+    setState(() => _menuOpen = true);
+    await showLevMenu(
+      anchor: anchor,
+      at: at,
+      actions: [
+        if (widget.onRename != null)
+          (
+            icon: Icons.edit_outlined,
+            label: l10n.conversationRename,
+            onSelected: widget.onRename!,
+          ),
+        if (widget.onDelete != null)
+          (
+            icon: Icons.delete_outline,
+            label: l10n.conversationDelete,
+            onSelected: widget.onDelete!,
+          ),
+      ],
+    );
+    if (mounted) setState(() => _menuOpen = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = levColors(context);
+    final l10n = AppLocalizations.of(context);
+
     return Semantics(
-      selected: selected,
+      selected: widget.selected,
       button: true,
       child: InkWell(
-        onTap: onTap,
-        onLongPress: onDelete,
-        onSecondaryTap: onDelete,
-        child: Container(
+        onTap: widget.onTap,
+        onHover: (on) => setState(() => _pointerOn = on),
+        onFocusChange: (on) => setState(() => _focused = on),
+        // The same menu, from the two gestures that have always meant "more":
+        // a long press where there is no mouse, a right-click where there is.
+        onLongPress: _hasMenu ? () => _openMenu(context) : null,
+        onSecondaryTapDown:
+            _hasMenu ? (d) => _openMenu(context, at: d.globalPosition) : null,
+        child: AnimatedContainer(
+          duration: reduceMotion(context) ? Duration.zero : LevMotion.fast,
+          curve: LevMotion.curve,
           constraints: const BoxConstraints(minHeight: LevSpace.minTouch),
-          alignment: AlignmentDirectional.centerStart,
-          padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: LevSpace.lg,
-            vertical: LevSpace.sm + 1,
-          ),
-          color: selected ? c.primarySoft : null,
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: selected ? c.primary : c.ink,
-                  fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+          padding: const EdgeInsetsDirectional.only(start: LevSpace.lg),
+          // Selected wins over hover: which conversation is open is the more
+          // important of the two facts, and a hovered selected row that lost
+          // its turquoise would read as a deselection.
+          color: widget.selected
+              ? c.primarySoft
+              : _active
+                  ? c.hover
+                  : null,
+          child: Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    vertical: LevSpace.md,
+                  ),
+                  child: Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: widget.selected ? c.primary : c.ink,
+                          fontWeight: widget.selected
+                              ? FontWeight.w500
+                              : FontWeight.w400,
+                        ),
+                  ),
                 ),
+              ),
+              if (_hasMenu && _hasPointer)
+                // The space is held whether or not the control is showing, so
+                // the title does not shorten and re-ellipsise under the
+                // pointer. Hidden, it is out of the tab order and out of the
+                // screen reader too — `Visibility` drops both.
+                Visibility(
+                  visible: _active,
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  child: Builder(
+                    builder: (button) => IconButton(
+                      onPressed: () => _openMenu(button),
+                      icon: const Icon(Icons.more_horiz, size: 18),
+                      tooltip: l10n.conversationActions,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: LevSpace.minTouch,
+                        height: LevSpace.minTouch,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

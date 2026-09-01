@@ -34,6 +34,11 @@
   "conversationGroupLastWeek": "7 הימים האחרונים",
   "conversationGroupEarlier": "קודם",
   "conversationUntitled": "שיחה ללא כותרת",
+  "conversationActions": "פעולות בשיחה",
+  "conversationRename": "שינוי שם",
+  "conversationRenameTitle": "שם השיחה",
+  "conversationRenameHint": "שם שיהיה קל לזהות אחר כך",
+  "conversationRenameEmpty": "לשיחה צריך שם.",
   "conversationDelete": "מחיקה",
   "conversationDeleteTitle": "למחוק את השיחה הזאת?",
   "conversationDeleteBody": "ההודעות שלה יימחקו מהמכשיר הזה. אי אפשר לבטל את הפעולה.",
@@ -117,5 +122,6 @@
   "retry": "לנסות שוב",
   "dismiss": "סגירה",
   "cancel": "ביטול",
+  "save": "שמירה",
   "back": "חזרה"
 }

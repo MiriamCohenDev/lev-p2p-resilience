@@ -272,7 +272,37 @@ abstract class AppLocalizations {
   /// **'Untitled conversation'**
   String get conversationUntitled;
 
-  /// Action that deletes a conversation
+  /// Tooltip and screen-reader label of the button on a conversation row that opens its menu
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation actions'**
+  String get conversationActions;
+
+  /// Entry in a conversation row's menu that opens the rename dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get conversationRename;
+
+  /// Title of the rename dialog. A statement of what is being edited rather than a question — unlike deleting, there is nothing here to confirm
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation name'**
+  String get conversationRenameTitle;
+
+  /// Placeholder in the rename dialog's text field
+  ///
+  /// In en, this message translates to:
+  /// **'A name you will recognise later'**
+  String get conversationRenameHint;
+
+  /// Announced by a screen reader on the rename dialog's disabled save button, saying why it cannot be pressed
+  ///
+  /// In en, this message translates to:
+  /// **'A conversation needs a name.'**
+  String get conversationRenameEmpty;
+
+  /// Action that deletes a conversation. Appears twice in one flow — as the menu entry that asks, and as the confirming button in the dialog that follows
   ///
   /// In en, this message translates to:
   /// **'Delete'**
@@ -619,6 +649,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get cancel;
+
+  /// Generic action that commits what a dialog was opened to change
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
 
   /// Generic action returning to the previous screen
   ///
