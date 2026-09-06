@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,7 +29,9 @@ import 'widgets/conversation_history.dart';
 class ChatScreen extends ConsumerWidget {
   const ChatScreen({this.conversationId, super.key});
 
-  /// `null` on `/chat`: no conversation chosen yet.
+  /// `null` on `/chat`: nothing chosen, so one is opened — see
+  /// `openBlankConversation`. It is a moment on the way into a conversation
+  /// rather than a screen of its own.
   final String? conversationId;
 
   @override
@@ -129,8 +133,15 @@ class _ChatBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
 
-    // The engine first: until it is loaded there is no conversation to open,
-    // and its failures are the ones with something specific to say.
+    // Nothing chosen: open a conversation rather than offering a button that
+    // asks the user to confirm what opening the chat already said. Ahead of the
+    // engine check on purpose — a conversation is created out of storage, not
+    // out of a model, so it opens while the weights are still loading and the
+    // model's own wait is shown inside it.
+    final id = conversationId;
+    if (id == null) return const _OpeningConversation();
+
+    // Then the engine: its failures are the ones with something specific to say.
     final engine = ref.watch(llmServiceProvider);
     if (engine.isLoading) return const _ModelPreparing();
     if (engine.hasError) {
@@ -140,51 +151,12 @@ class _ChatBody extends ConsumerWidget {
       );
     }
 
-    final id = conversationId;
-    if (id == null) {
-      return LevEmptyState(
-        icon: Icons.chat_bubble_outline,
-        title: l10n.conversationsEmptyTitle,
-        body: l10n.conversationsEmptyBody,
-        action: SizedBox(
-          width: 240,
-          child: LevButton(
-            label: l10n.homeStartChat,
-            onPressed: () async {
-              final newId = await startConversation(ref);
-              if (!context.mounted) return;
-              context.go(AppRoutes.conversation(newId));
-            },
-          ),
-        ),
-      );
-    }
-
     final chat = ref.watch(chatNotifierProvider(id));
 
     return chat.when(
       // §8: the prefill must be visible, and a blank or frozen screen is a
       // defect. It is a labelled line rather than a bare spinner.
-      loading: () => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(
-              LevSpace.md,
-              LevSpace.md,
-              LevSpace.md,
-              0,
-            ),
-            child: LevBanner(text: l10n.chatPreparingSession),
-          ),
-          const Spacer(),
-          ChatComposer(
-            isBusy: true,
-            enabled: false,
-            onSend: (_) {},
-            onStop: () {},
-          ),
-        ],
-      ),
+      loading: () => const _PreparingSession(),
       error: (error, _) => LevEmptyState(
         icon: Icons.error_outline,
         tone: LevTone.warning,
@@ -201,6 +173,109 @@ class _ChatBody extends ConsumerWidget {
         ),
       ),
       data: (state) => _Conversation(conversationId: id, state: state),
+    );
+  }
+}
+
+/// `/chat` with nothing chosen: a conversation on its way in.
+///
+/// Stateful because opening is asynchronous and must happen exactly **once**.
+/// Starting it from `build` would start it again on every rebuild, and the list
+/// this writes to is watched by the drawer beside it — so each new conversation
+/// would rebuild this screen, which would create another.
+class _OpeningConversation extends ConsumerStatefulWidget {
+  const _OpeningConversation();
+
+  @override
+  ConsumerState<_OpeningConversation> createState() =>
+      _OpeningConversationState();
+}
+
+class _OpeningConversationState extends ConsumerState<_OpeningConversation> {
+  /// Why the conversation could not be opened, once that has happened.
+  ///
+  /// Only storage can fail here — a model that cannot be resolved does not stop
+  /// a conversation being created (see [startConversation]) — and a chat that
+  /// silently shows nothing on a storage failure is the blank screen §8 calls a
+  /// defect. So it is reported, with the same words and the same retry the
+  /// conversation itself uses when its history cannot be read.
+  Object? _failure;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_open());
+  }
+
+  Future<void> _open() async {
+    try {
+      final id = await openBlankConversation(ref);
+      if (!mounted) return;
+      context.go(AppRoutes.conversation(id));
+    } on Object catch (failure) {
+      if (!mounted) return;
+      setState(() => _failure = failure);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failure == null) return const _PreparingSession();
+
+    final l10n = AppLocalizations.of(context);
+    return LevEmptyState(
+      icon: Icons.error_outline,
+      tone: LevTone.warning,
+      title: l10n.chatLoadFailed,
+      body: l10n.chatTruncatedBody,
+      footnote: l10n.aidStillWorks,
+      action: SizedBox(
+        width: 240,
+        child: LevButton(
+          label: l10n.retry,
+          kind: LevButtonKind.secondary,
+          onPressed: () {
+            setState(() => _failure = null);
+            unawaited(_open());
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// The wait before a conversation can be typed into.
+///
+/// §8: the prefill must be visible, and a blank or frozen screen is a defect. It
+/// is a labelled line rather than a bare spinner, over a composer that is
+/// visibly not ready yet. Shared by the two waits that end in the same place —
+/// the session prefilling, and a conversation being opened for `/chat`.
+class _PreparingSession extends StatelessWidget {
+  const _PreparingSession();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            LevSpace.md,
+            LevSpace.md,
+            LevSpace.md,
+            0,
+          ),
+          child: LevBanner(text: l10n.chatPreparingSession),
+        ),
+        const Spacer(),
+        ChatComposer(
+          isBusy: true,
+          enabled: false,
+          onSend: (_) {},
+          onStop: () {},
+        ),
+      ],
     );
   }
 }

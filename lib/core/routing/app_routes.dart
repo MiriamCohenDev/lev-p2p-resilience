@@ -13,10 +13,16 @@
 abstract final class AppRoutes {
   static const String home = '/';
 
-  /// The chat with no conversation chosen. Shows the empty state and offers the
-  /// history, rather than redirecting: a redirect would need the conversation
-  /// list before the router could answer, and the empty state is a real screen
-  /// the design specifies anyway.
+  /// The chat with no conversation chosen — the bar's Chat destination.
+  ///
+  /// It opens a blank conversation and moves to [conversation]: entering the
+  /// chat is the request, and a screen asking to confirm it was one step in
+  /// front of the only thing anyone comes here to do.
+  ///
+  /// **The move is made by the screen, not by a `redirect` here.** Which
+  /// conversation to open is an answer out of the encrypted database, and a
+  /// router redirect would have to guess at it while it loads — the same reason
+  /// the first-run gate sits around the router rather than inside it.
   static const String chat = '/chat';
 
   /// The conversation id, as it appears in the path and in `state.pathParameters`.

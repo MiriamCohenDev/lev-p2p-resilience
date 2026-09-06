@@ -1539,6 +1539,85 @@ that is guaranteed to exist in the bundle.
 
 ---
 
+## #32 — The chat opens a conversation, and reuses a blank one
+
+**Status:** Accepted — supersedes the "shows the empty state rather than
+redirecting" half of `AppRoutes.chat`
+
+**Decision.** `/chat` no longer shows an empty state with a "start a
+conversation" button. It opens a conversation and moves to `/chat/<id>`. Which
+conversation: the most recent one **if nobody has said anything in it**,
+otherwise a new one. The move is made by the screen — a new
+`_OpeningConversation` in `chat_screen.dart` calling `openBlankConversation` —
+not by a router `redirect`. `ChatRepository` gains `latestConversation()`.
+
+**Rationale.**
+
+*On opening rather than asking.* The button asked the user to confirm the thing
+they had already asked for by tapping Chat. Nothing on that screen was a choice:
+its only control started a conversation, and the history it offered instead was
+already beside it in the drawer.
+
+*On reusing a blank conversation.* Chat is a permanent destination in the bar
+(#22), so it is entered and left repeatedly — and one row per visit would fill
+the conversation history, the one list in the product that has to stay
+navigable, with untitled conversations nobody spoke in. Only the newest is
+considered: anything older has a conversation stacked on top of it, and reaching
+further back would reopen an abandoned start from a different day rather than
+beginning today's.
+
+*On asking the messages, not the title.* An unspoken conversation normally has an
+empty title, because the title is derived from the opening message — but a title
+is also something a person can set from the row's menu (#30), and a renamed
+conversation must not be mistaken for a blank one and reopened as if it were new.
+
+*On `latestConversation()` rather than the conversation list.* This was first
+written against `conversationsProvider`, and it hung two widget tests. A
+`StreamProvider`'s `.future` completes only while something keeps the provider
+alive; on the mobile layout the history is inside `Scaffold.drawer` and is not
+built until the drawer opens, so nothing else was listening and the chat sat on
+its "preparing" screen forever. That is the same trap `messagesOf` exists to
+avoid (#15) — a question asked once must not be answered with a subscription —
+so the answer is the same shape: one snapshot query, `LIMIT 1`.
+
+*On the screen making the move, not the router.* Which conversation to open is an
+answer out of the encrypted database. A `redirect` would have to guess at it
+while that answer loads and correct itself afterwards, which is exactly why the
+first-run gate sits around the router rather than inside it (#9's provider note).
+
+**Rejected alternatives.**
+
+- *Create a conversation on every entry* — one rule instead of two, and it is
+  what the "new conversation" button already does on each press. Rejected on the
+  history filling up: a button pressed deliberately is not the same as a tab
+  crossed on the way somewhere else.
+- *Reopen the most recent conversation, spoken in or not* — arguably friendlier,
+  and it is what a messaging app does. Rejected: this is a supportive chat, not
+  a thread with a person, and landing back inside yesterday's conversation
+  presumes the user came to continue it. Resuming is what Home's resume card and
+  the history are for, and both are one tap away.
+- *A `redirect` on the route* — no widget state to hold. Rejected on the
+  asynchronous answer above.
+- *Keep the empty state and simply move its button into the bar* — least code.
+  Rejected: the bar already has that button (`conversationsNew`), which is what
+  made the screen's own copy of it redundant rather than merely extra.
+
+**Consequence.** `/chat` is a moment on the way into a conversation rather than a
+screen, so the wait it shows is the session's own — the labelled line and the
+disabled composer, now a shared `_PreparingSession` rather than a copy. Storage
+is the only thing that can fail there, and it fails loudly: the same words and
+the same retry the conversation itself uses when its history cannot be read,
+ending as design rule 9 requires in "mutual aid still works".
+
+A conversation is now created before the model is resolved rather than after —
+the open runs ahead of the engine check, because a conversation comes out of
+storage and not out of a model. `startConversation` already tolerated an
+unresolvable model for exactly this reason; what changes is that the model's own
+wait is now shown *inside* the conversation, which is where it can be typed into
+the moment it clears.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

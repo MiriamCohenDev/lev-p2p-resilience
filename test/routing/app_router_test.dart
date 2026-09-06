@@ -43,6 +43,58 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
   }, replies: ['ok']);
 
+  group('the chat destination opens a conversation, not a button', () {
+    /// Enters the chat from the bar and lets the conversation open.
+    Future<void> openChat(WidgetTester tester) async {
+      await tester.tap(find.text(l10n.navChat));
+      await tester.pumpAndSettle();
+    }
+
+    chatWidgetTest('entering the chat lands in a conversation',
+        (tester, harness) async {
+      await harness.pumpApp(tester);
+      await openChat(tester);
+
+      // A composer to type into, rather than a button asking to confirm the
+      // thing that opening the chat already said.
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.text(l10n.homeStartChat), findsNothing);
+      expect(await harness.conversations(), hasLength(1));
+    }, replies: ['ok']);
+
+    chatWidgetTest('leaving and coming back reuses the blank conversation',
+        (tester, harness) async {
+      await harness.pumpApp(tester);
+      await openChat(tester);
+
+      await tester.tap(find.text(l10n.navHome));
+      await tester.pumpAndSettle();
+      await openChat(tester);
+
+      // The chat is a permanent destination, so it is entered and left
+      // repeatedly. One untitled row per visit would fill the history.
+      expect(await harness.conversations(), hasLength(1));
+    }, replies: ['ok']);
+
+    chatWidgetTest('coming back to a conversation spoken in starts a new one',
+        (tester, harness) async {
+      await harness.pumpApp(tester);
+      await openChat(tester);
+
+      await tester.enterText(find.byType(TextField), 'something said');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(l10n.navHome));
+      await tester.pumpAndSettle();
+      await openChat(tester);
+
+      // Reuse is for a conversation nobody said anything in — resuming one is
+      // what the history, and Home's resume card, are for.
+      expect(await harness.conversations(), hasLength(2));
+    }, replies: ['ok']);
+  });
+
   chatWidgetTest("Home's primary action creates a conversation and opens it",
       (tester, harness) async {
     await harness.pumpApp(tester);

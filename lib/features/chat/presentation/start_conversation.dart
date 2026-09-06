@@ -31,3 +31,32 @@ Future<String> startConversation(WidgetRef ref) async {
   final conversation = await repository.createConversation(modelId: modelId);
   return conversation.id;
 }
+
+/// The conversation `/chat` should open on: a blank one, ready to be spoken in.
+///
+/// Entering the chat with nothing chosen used to show an empty state with a
+/// button; it opens a conversation instead, because the button asked the user to
+/// confirm the thing they had already asked for by opening the chat.
+///
+/// **It reuses a blank conversation rather than minting one per visit.** The
+/// chat is a permanent destination in the bar, so it is entered and left
+/// repeatedly, and creating a row each time would fill the history — the one
+/// list that has to stay navigable — with untitled conversations nobody said
+/// anything in. Only the most recent one is considered: anything older has a
+/// conversation on top of it, and reaching back past that would reopen
+/// yesterday's abandoned start instead of beginning today's.
+///
+/// Emptiness is asked of the messages, not inferred from the empty title. The
+/// title is derived from the opening message, so the two normally agree — but a
+/// title is also something a person can set from the row's menu, and a renamed
+/// conversation must not be mistaken for a blank one.
+Future<String> openBlankConversation(WidgetRef ref) async {
+  final repository = await ref.read(chatRepositoryProvider.future);
+
+  final newest = await repository.latestConversation();
+  if (newest != null && (await repository.messagesOf(newest.id)).isEmpty) {
+    return newest.id;
+  }
+
+  return startConversation(ref);
+}

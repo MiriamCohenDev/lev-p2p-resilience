@@ -23,6 +23,12 @@ class DriftChatRepository implements ChatRepository {
       _dao.watchConversations().map((rows) => rows.map(_toDomain).toList());
 
   @override
+  Future<Conversation?> latestConversation() async {
+    final row = await _dao.latestConversation();
+    return row == null ? null : _toDomain(row);
+  }
+
+  @override
   Future<Conversation> createConversation({
     String? title,
     String? systemPromptVersion,
