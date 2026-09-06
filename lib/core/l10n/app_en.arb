@@ -21,6 +21,16 @@
     "description": "Bottom navigation / rail destination: mutual aid"
   },
 
+  "sideListHide": "Hide the conversation list",
+  "@sideListHide": {
+    "description": "Tooltip of the desktop bar control that collapses the permanent list column. Desktop only — on mobile the list is a drawer, which closes itself"
+  },
+
+  "sideListShow": "Show the conversation list",
+  "@sideListShow": {
+    "description": "Tooltip of the same control once the column is collapsed, when it brings it back"
+  },
+
   "welcomeTagline": "A quiet place to talk, and a small net of people nearby.",
   "@welcomeTagline": {
     "description": "One-line description of what LEV is, on the first-run screen"

@@ -25,6 +25,17 @@ void main() {
   Future<String> conversationIn(ChatHarness harness) async =>
       (await harness.repository.createConversation()).id;
 
+  /// A message, in the conversation itself.
+  ///
+  /// Scoped to the bubbles rather than searched for across the screen, because
+  /// the bar carries the conversation's name and that name is derived from its
+  /// opening message: a bare `find.text` on the first thing said now matches
+  /// twice, in two different places, and both are correct.
+  Finder saidInChat(String text) => find.descendant(
+        of: find.byType(LevBubble),
+        matching: find.text(text),
+      );
+
   Future<void> send(WidgetTester tester, String text) async {
     await tester.enterText(find.byType(TextField), text);
     await tester.testTextInput.receiveAction(TextInputAction.send);
@@ -47,7 +58,7 @@ void main() {
     await harness.pump(tester, ChatScreen(conversationId: id));
     await send(tester, 'hello there');
 
-    expect(find.text('hello there'), findsOneWidget);
+    expect(saidInChat('hello there'), findsOneWidget);
     expect(find.text('I hear you.'), findsOneWidget);
 
     // The database is the real assertion — what is on screen could be state
@@ -125,11 +136,47 @@ void main() {
     await send(tester, '**not bold**');
 
     // Hers is quoted back exactly as she typed it.
-    expect(find.text('**not bold**'), findsOneWidget);
+    expect(saidInChat('**not bold**'), findsOneWidget);
     // His is read.
     expect(find.text('I hear you.'), findsOneWidget);
     expect(find.text('I hear **you**.'), findsNothing);
   }, replies: ['I hear **you**.']);
+
+  group('the bar names the conversation that is open', () {
+    chatWidgetTest('the derived title replaces "Chat" once there is one',
+        (tester, harness) async {
+      final id = await conversationIn(harness);
+
+      await harness.pump(tester, ChatScreen(conversationId: id));
+
+      // Nothing said yet, so there is no name to show and the destination's own
+      // is what is left.
+      expect(find.text(l10n.chatTitle), findsOneWidget);
+
+      await send(tester, 'about the long day');
+
+      // The bar, not a bubble: the same words are in both now.
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('about the long day'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l10n.chatTitle), findsNothing);
+    }, replies: ['I hear you.']);
+
+    chatWidgetTest('a name chosen in the list lands in the bar',
+        (tester, harness) async {
+      final id = await conversationIn(harness);
+      await harness.pump(tester, ChatScreen(conversationId: id));
+
+      await harness.repository.updateTitle(id, 'the one about work');
+      await tester.pumpAndSettle();
+
+      expect(find.text('the one about work'), findsOneWidget);
+    });
+  });
 
   chatWidgetTest('a multi-turn conversation keeps every turn',
       (tester, harness) async {
@@ -178,7 +225,7 @@ void main() {
     await harness.pump(tester, const SizedBox.shrink());
     await harness.pump(tester, ChatScreen(conversationId: id));
 
-    expect(find.text('said earlier'), findsOneWidget);
+    expect(saidInChat('said earlier'), findsOneWidget);
     expect(find.text('ok'), findsOneWidget);
     expect(find.text(l10n.conversationsEmptyTitle), findsNothing);
   }, replies: ['ok']);

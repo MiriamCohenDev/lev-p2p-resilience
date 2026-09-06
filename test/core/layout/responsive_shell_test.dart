@@ -65,6 +65,87 @@ void main() {
     expect(find.byTooltip(l10n.settingsTitle), findsOneWidget);
   });
 
+  group('the desktop list column can be put away', () {
+    chatWidgetTest('the bar control collapses it and brings it back',
+        (tester, harness) async {
+      sized(tester, const Size(1200, 900));
+
+      await harness.pump(tester, const ChatScreen());
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+
+      double columnWidth() => tester
+          .getSize(
+            find.ancestor(
+              of: find.text(l10n.conversationsSearchHint),
+              matching: find.byType(ClipRect),
+            ).first,
+          )
+          .width;
+
+      expect(columnWidth(), greaterThan(0));
+
+      await tester.tap(find.byTooltip(l10n.sideListHide));
+      await tester.pumpAndSettle();
+
+      // Collapsed, not unmounted: the list keeps its scroll and its search text
+      // for when it comes back.
+      expect(columnWidth(), 0);
+      expect(find.text(l10n.conversationsSearchHint), findsOneWidget);
+
+      await tester.tap(find.byTooltip(l10n.sideListShow));
+      await tester.pumpAndSettle();
+
+      expect(columnWidth(), greaterThan(0));
+    });
+
+    chatWidgetTest('it stays put away when a conversation is opened',
+        (tester, harness) async {
+      // The reason the state is in a provider rather than in the shell:
+      // `/chat/<id>` is a new page, so a `State` here would be discarded and the
+      // column would spring back open on the one action still reachable while it
+      // is collapsed.
+      sized(tester, const Size(1200, 900));
+      await harness.repository.createConversation(title: 'yesterday');
+
+      await harness.pumpApp(tester);
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+
+      await tester.tap(find.byIcon(Icons.chat_bubble_outline).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(l10n.sideListHide));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip(l10n.conversationsNew));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip(l10n.sideListShow), findsOneWidget);
+      expect(find.byTooltip(l10n.sideListHide), findsNothing);
+    });
+
+    chatWidgetTest('a screen with no list column carries no control',
+        (tester, harness) async {
+      sized(tester, const Size(1200, 900));
+
+      await harness.pump(tester, const HomeScreen());
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+
+      expect(find.byTooltip(l10n.sideListHide), findsNothing);
+      expect(find.byTooltip(l10n.sideListShow), findsNothing);
+    });
+
+    chatWidgetTest('below the breakpoint there is nothing to collapse',
+        (tester, harness) async {
+      sized(tester, const Size(420, 900));
+
+      await harness.pump(tester, const ChatScreen());
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+
+      // The drawer closes itself; a second control for the same thing would be
+      // one more item in a bar that has no room for it.
+      expect(find.byTooltip(l10n.sideListHide), findsNothing);
+    });
+  });
+
   group('the bar carries the logo only where the rail cannot', () {
     chatWidgetTest('below the breakpoint Home shows the mark',
         (tester, harness) async {

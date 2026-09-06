@@ -122,6 +122,18 @@ abstract class AppLocalizations {
   /// **'Help'**
   String get navAid;
 
+  /// Tooltip of the desktop bar control that collapses the permanent list column. Desktop only — on mobile the list is a drawer, which closes itself
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the conversation list'**
+  String get sideListHide;
+
+  /// Tooltip of the same control once the column is collapsed, when it brings it back
+  ///
+  /// In en, this message translates to:
+  /// **'Show the conversation list'**
+  String get sideListShow;
+
   /// One-line description of what LEV is, on the first-run screen
   ///
   /// In en, this message translates to:

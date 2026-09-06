@@ -22,6 +22,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navAid => 'Help';
 
   @override
+  String get sideListHide => 'Hide the conversation list';
+
+  @override
+  String get sideListShow => 'Show the conversation list';
+
+  @override
   String get welcomeTagline =>
       'A quiet place to talk, and a small net of people nearby.';
 

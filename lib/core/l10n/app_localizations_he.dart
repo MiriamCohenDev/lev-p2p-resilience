@@ -22,6 +22,12 @@ class AppLocalizationsHe extends AppLocalizations {
   String get navAid => 'עזרה';
 
   @override
+  String get sideListHide => 'הסתרת רשימת השיחות';
+
+  @override
+  String get sideListShow => 'הצגת רשימת השיחות';
+
+  @override
   String get welcomeTagline =>
       'מקום שקט לדבר בו, ורשת עזרה קטנה של אנשים לידך.';
 

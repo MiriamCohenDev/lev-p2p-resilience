@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/di/chat_providers.dart';
 import '../../../core/di/llm_providers.dart';
 import '../../../core/di/prompt_providers.dart';
 import '../../../core/l10n/app_localizations.dart';
@@ -56,7 +57,14 @@ class _ChatShell extends ConsumerWidget {
     return LevShell(
       destination: LevDestination.chat,
       onDestinationChanged: (d) => goToDestination(context, d),
-      title: Text(l10n.chatTitle),
+      // The bar names the conversation that is open, as the design draws it on
+      // both layouts. One line, ellipsised: a derived title runs to sixty
+      // graphemes, which no bar has room for.
+      title: Text(
+        _title(ref) ?? l10n.chatTitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       sideList: ConversationHistory(
         selectedId: conversationId,
         showSettings: !LevBreakpoint.isWide(context),
@@ -71,6 +79,32 @@ class _ChatShell extends ConsumerWidget {
       onOpenSettings: () => context.push(AppRoutes.settings),
       body: _ChatBody(conversationId: conversationId),
     );
+  }
+
+  /// The open conversation's own name, or null to fall back to "Chat".
+  ///
+  /// Null covers every state where there is no name to show: no conversation
+  /// chosen, the list still loading, and — the one worth spelling out — a
+  /// conversation that has not been spoken in yet, whose title is empty until
+  /// `ChatNotifier` derives one from the opening message. The list writes
+  /// `conversationUntitled` in that gap because a row with no text at all is
+  /// unclickable; a bar has "Chat" to fall back on, which says the same thing
+  /// without announcing an absence.
+  ///
+  /// Read from [conversationsProvider] rather than fetched here, so a rename or
+  /// the derived title lands in the bar the moment it is stored.
+  String? _title(WidgetRef ref) {
+    final id = conversationId;
+    if (id == null) return null;
+
+    final conversations = ref.watch(conversationsProvider).value;
+    if (conversations == null) return null;
+
+    for (final conversation in conversations) {
+      if (conversation.id != id) continue;
+      return conversation.title.isEmpty ? null : conversation.title;
+    }
+    return null;
   }
 
   Future<void> _startConversation(BuildContext context, WidgetRef ref) async {

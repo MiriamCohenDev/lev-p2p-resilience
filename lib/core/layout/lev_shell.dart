@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../widgets/lev_widgets.dart';
+import 'side_list_visibility.dart';
 
 /// The responsive navigation wrapper.
 ///
@@ -16,13 +18,20 @@ import '../widgets/lev_widgets.dart';
 /// maintain, which is the whole reason this exists rather than a `HomeScreen`
 /// and a `HomeScreenDesktop`.
 ///
+/// On desktop the list column can be **put away** — the bar carries a control
+/// that collapses it, the way every chat application with a wide layout does.
+/// A conversation is worth reading on the whole width when the list is not
+/// being used, and that is a choice only the person reading can make. Whether
+/// it is showing is held in [sideListOpenProvider], not here; see that file for
+/// why.
+///
 /// It reads its own destination labels from [AppLocalizations] rather than
 /// taking them as parameters: they are fixed for the whole application, and
 /// making every screen pass the same three strings would be noise. #11 forbids
 /// string *literals* in widgets, not localisation lookups.
 enum LevDestination { home, chat, aid }
 
-class LevShell extends StatelessWidget {
+class LevShell extends ConsumerWidget {
   const LevShell({
     super.key,
     required this.destination,
@@ -73,8 +82,10 @@ class LevShell extends StatelessWidget {
       };
 
   @override
-  Widget build(BuildContext context) {
-    return LevBreakpoint.isWide(context) ? _buildWide(context) : _buildNarrow(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    return LevBreakpoint.isWide(context)
+        ? _buildWide(context, ref)
+        : _buildNarrow(context);
   }
 
   // ───────────────────────────── mobile ─────────────────────────────
@@ -120,9 +131,10 @@ class LevShell extends StatelessWidget {
 
   // ───────────────────────────── desktop ─────────────────────────────
 
-  Widget _buildWide(BuildContext context) {
+  Widget _buildWide(BuildContext context, WidgetRef ref) {
     final c = levColors(context);
     final l10n = AppLocalizations.of(context);
+    final sideListOpen = ref.watch(sideListOpenProvider);
 
     return Scaffold(
       body: Row(
@@ -186,19 +198,22 @@ class LevShell extends StatelessWidget {
             ),
           ),
           if (sideList != null)
-            Container(
-              width: 250,
-              decoration: BoxDecoration(
-                color: c.surface,
-                border: BorderDirectional(end: BorderSide(color: c.line)),
-              ),
-              child: SafeArea(child: sideList!),
-            ),
-          // The content takes whatever is left.
+            _SideListColumn(open: sideListOpen, child: sideList!),
+          // The content takes whatever is left — all of it, once the column is
+          // put away.
           Expanded(
             child: Column(
               children: [
-                _DesktopBar(title: title, actions: appBarActions),
+                _DesktopBar(
+                  title: title,
+                  actions: appBarActions,
+                  sideListOpen: sideListOpen,
+                  // No control on a screen that has no list to hide (Home, and
+                  // mutual aid for now).
+                  onToggleSideList: sideList == null
+                      ? null
+                      : () => ref.read(sideListOpenProvider.notifier).toggle(),
+                ),
                 Expanded(child: body),
               ],
             ),
@@ -209,15 +224,76 @@ class LevShell extends StatelessWidget {
   }
 }
 
-class _DesktopBar extends StatelessWidget {
-  const _DesktopBar({required this.title, this.actions});
+/// The list column, and the width it takes when it is showing.
+///
+/// **It collapses rather than unmounting.** The list keeps its scroll position,
+/// its search text and its element tree while it is away, so bringing it back is
+/// the state going on screen again rather than being rebuilt from nothing — and
+/// the width can animate, which an `if` in the `Row` could not do.
+///
+/// The child is held at its full width inside an [OverflowBox] and clipped,
+/// instead of being laid out into a shrinking box: a 250px column squeezed
+/// through 40px would re-wrap its rows and overflow its own controls on the way
+/// past. Aligned to the *start*, so under RTL it slides out towards the right
+/// edge, where it lives.
+class _SideListColumn extends StatelessWidget {
+  const _SideListColumn({required this.open, required this.child});
 
-  final Widget title;
-  final List<Widget>? actions;
+  static const double width = 250;
+
+  final bool open;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final c = levColors(context);
+
+    return AnimatedContainer(
+      duration: reduceMotion(context) ? Duration.zero : LevMotion.standard,
+      curve: LevMotion.curve,
+      width: open ? width : 0,
+      decoration: BoxDecoration(
+        color: c.surface,
+        // The rail already draws a line on its own end. A second one left
+        // standing over a column of zero width would read as an edge with
+        // nothing behind it.
+        border: BorderDirectional(
+          end: BorderSide(color: open ? c.line : Colors.transparent),
+        ),
+      ),
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: AlignmentDirectional.centerStart,
+          minWidth: width,
+          maxWidth: width,
+          child: SafeArea(child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopBar extends StatelessWidget {
+  const _DesktopBar({
+    required this.title,
+    this.actions,
+    this.sideListOpen = true,
+    this.onToggleSideList,
+  });
+
+  final Widget title;
+  final List<Widget>? actions;
+
+  final bool sideListOpen;
+
+  /// Null on a screen with no list column, where the control would do nothing.
+  final VoidCallback? onToggleSideList;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = levColors(context);
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       height: 56,
       padding: const EdgeInsetsDirectional.symmetric(horizontal: LevSpace.xl),
@@ -227,11 +303,36 @@ class _DesktopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          DefaultTextStyle.merge(
-            style: Theme.of(context).textTheme.titleLarge!,
-            child: title,
+          if (onToggleSideList != null) ...[
+            // On the start edge, before the title, and the same icon in both
+            // states — the design draws it that way in
+            // `docs/design/screens/07-chat-desktop-{open,close}-sidbar.png`,
+            // where it sits against the rail with the column it opens directly
+            // under it.
+            //
+            // The pair that suggests itself — a chevron in, a chevron out —
+            // points at a side, and Flutter does not mirror it: in Hebrew, where
+            // the column is on the right, it would point away from the thing it
+            // opens. The tooltip carries the action; whether the column is there
+            // carries the state.
+            IconButton(
+              onPressed: onToggleSideList,
+              icon: const Icon(Icons.menu),
+              tooltip: sideListOpen ? l10n.sideListHide : l10n.sideListShow,
+            ),
+            const SizedBox(width: LevSpace.sm),
+          ],
+          // `Expanded` rather than a `Spacer` after it: the chat's bar carries
+          // the open conversation's name, which runs to sixty graphemes, and a
+          // title laid out at its natural width would push the actions off the
+          // end of the row. Taking the space instead lets the text ellipsise in
+          // it, and keeps the actions on the end edge where they were.
+          Expanded(
+            child: DefaultTextStyle.merge(
+              style: Theme.of(context).textTheme.titleLarge!,
+              child: title,
+            ),
           ),
-          const Spacer(),
           ...?actions,
         ],
       ),
