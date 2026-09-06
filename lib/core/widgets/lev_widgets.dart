@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../support/support_resources.dart';
@@ -357,7 +359,9 @@ class LevBubble extends StatelessWidget {
   final bool fromUser;
 
   /// Still arriving. Renders a caret so a paused stream is visibly *paused*
-  /// rather than indistinguishable from a finished short reply.
+  /// rather than indistinguishable from a finished short reply, and reveals the
+  /// text at reading speed rather than at whatever rate the model happens to
+  /// produce it.
   final bool isStreaming;
 
   @override
@@ -394,17 +398,494 @@ class LevBubble extends StatelessWidget {
               bottomEnd: fromUser ? LevRadius.bubble : LevRadius.bubbleTail,
             ),
           ),
-          child: Text(
-            isStreaming ? '$text▌' : text,
-            style: Theme.of(context)
-                .textTheme
-                .bodyLarge
-                ?.copyWith(color: fromUser ? c.onPrimary : c.ink),
-          ),
+          child: _content(context, c),
         ),
       ),
     );
   }
+
+  Widget _content(BuildContext context, LevColors c) {
+    final base = Theme.of(context)
+        .textTheme
+        .bodyLarge!
+        .copyWith(color: fromUser ? c.onPrimary : c.ink);
+
+    // **What the user wrote is never parsed.** Someone who types `**` means
+    // `**`, and quietly eating her asterisks would be the application editing
+    // her own words back at her.
+    if (fromUser) return Text(text, style: base);
+
+    if (!isStreaming) return LevMarkdownText(text, style: base);
+
+    return _LevReveal(
+      text: text,
+      builder: (context, revealed) =>
+          LevMarkdownText(revealed, style: base, isStreaming: true),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// The model's prose
+// ═══════════════════════════════════════════════════════════════════════
+
+/// The caret that marks a reply still arriving.
+const String _caret = '▌';
+
+/// The model's prose, with the small markdown subset it actually emits.
+///
+/// **Never used for what the user wrote** — see `LevBubble._content`.
+///
+/// Renders `**bold**`, `*italic*`/`_italic_`, `` `code` ``, `#` headings (as
+/// bold — there is no heading scale in a chat bubble), `-`/`*`/`+` bullets and
+/// `1.` numbered items, keeping the model's own numbering. **Everything else
+/// passes through character for character**: links and images (an offline
+/// application must never draw something tappable that cannot be tapped, #25),
+/// tables, block quotes, rules, HTML, strikethrough, and fence lines.
+///
+/// The invariant that keeps this honest, and that `lev_markdown_test.dart`
+/// pins: **for a single-paragraph source carrying no valid marker, the rendered
+/// plain text is byte-identical to the source** — one `Text.rich`, no wrapper.
+/// That is what lets `find.text` keep matching a bubble. A multi-block source
+/// is a `Column`, so no single finder sees the whole reply.
+class LevMarkdownText extends StatelessWidget {
+  const LevMarkdownText(
+    this.text, {
+    super.key,
+    this.style,
+    this.isStreaming = false,
+  });
+
+  final String text;
+
+  /// Defaults to `bodyLarge`. Every other style here is derived from it.
+  final TextStyle? style;
+
+  /// Appends the caret, and clips a marker run left dangling at the tail.
+  final bool isStreaming;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = levColors(context);
+    final base = style ?? Theme.of(context).textTheme.bodyLarge!;
+
+    // A prefix ending mid-marker would render the marker literally for one
+    // frame and then snap — the flicker this whole design exists to avoid. The
+    // cost is at most a few characters of tail latency, hidden behind the caret.
+    final source = isStreaming ? text.replaceFirst(_danglingMarkers, '') : text;
+    final blocks = _parseBlocks(source);
+
+    if (blocks.isEmpty) {
+      return Text.rich(TextSpan(text: isStreaming ? _caret : ''), style: base);
+    }
+
+    Widget widgetFor(_Block block, {required bool last}) {
+      final caret = last && isStreaming;
+      switch (block) {
+        case _Para(:final body, :final bold):
+          final s = bold ? base.copyWith(fontWeight: _bold) : base;
+          return Text.rich(
+            TextSpan(children: _parseInline(body, s, c, caret: caret)),
+            style: s,
+          );
+        case _Item(:final marker, :final body):
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: LevSpace.xl,
+                child: Text(marker, style: base.copyWith(color: c.muted)),
+              ),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: _parseInline(body, base, c, caret: caret)),
+                  style: base,
+                ),
+              ),
+            ],
+          );
+      }
+    }
+
+    // The single-paragraph case is the overwhelming majority and the one the
+    // byte-identical invariant is about, so it gets no wrapper at all.
+    if (blocks.length == 1 && blocks.first is _Para) {
+      return widgetFor(blocks.first, last: true);
+    }
+
+    final children = <Widget>[];
+    for (var i = 0; i < blocks.length; i++) {
+      if (i > 0) {
+        // Items in a run belong together; anything else gets a paragraph gap.
+        final tight = blocks[i] is _Item && blocks[i - 1] is _Item;
+        children.add(SizedBox(height: tight ? LevSpace.xs : LevSpace.sm));
+      }
+      children.add(widgetFor(blocks[i], last: i == blocks.length - 1));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+  }
+}
+
+/// The one weight that means emphasis in this product — `LevButton`,
+/// `LevSupportCard` and `_TruncatedNotice` all use it. Never w700.
+const FontWeight _bold = FontWeight.w600;
+
+final RegExp _danglingMarkers = RegExp(r'[*_`#\\]+$');
+final RegExp _heading = RegExp(r'^#{1,6}\s+(.*)$');
+final RegExp _bullet = RegExp(r'^[-*+]\s+(.*)$');
+final RegExp _numbered = RegExp(r'^(\d{1,3})[.)]\s+(.*)$');
+final RegExp _wordChar = RegExp(r'[\p{L}\p{N}_]', unicode: true);
+
+const String _escapable = r'\*_`#';
+
+sealed class _Block {
+  const _Block();
+}
+
+class _Para extends _Block {
+  const _Para(this.body, {this.bold = false});
+  final String body;
+  final bool bold;
+}
+
+class _Item extends _Block {
+  const _Item(this.marker, this.body);
+  final String marker;
+  final String body;
+}
+
+/// Splits prose into blocks in one pass. Nesting is flattened to one level:
+/// a chat bubble is not a document, and an indented sub-list in a supportive
+/// reply is the model imitating documentation rather than talking.
+List<_Block> _parseBlocks(String source) {
+  final blocks = <_Block>[];
+  final para = StringBuffer();
+
+  void flush() {
+    if (para.isEmpty) return;
+    blocks.add(_Para(para.toString()));
+    para.clear();
+  }
+
+  for (final raw in source.split('\n')) {
+    final line = raw.trimLeft();
+
+    if (line.isEmpty) {
+      flush();
+      continue;
+    }
+
+    final heading = _heading.firstMatch(line);
+    if (heading != null) {
+      flush();
+      blocks.add(_Para(heading.group(1)!, bold: true));
+      continue;
+    }
+
+    final bullet = _bullet.firstMatch(line);
+    if (bullet != null) {
+      flush();
+      blocks.add(_Item('•', bullet.group(1)!));
+      continue;
+    }
+
+    final numbered = _numbered.firstMatch(line);
+    if (numbered != null) {
+      flush();
+      // The model's own number, never renumbered. If it counts 1, 2, 2, 4 that
+      // is what it said, and silently correcting it would be the interface
+      // claiming the model was more coherent than it was.
+      blocks.add(_Item('${numbered.group(1)!}.', numbered.group(2)!));
+      continue;
+    }
+
+    if (para.isNotEmpty) para.write('\n');
+    para.write(line);
+  }
+
+  flush();
+  return blocks;
+}
+
+/// Inline emphasis in one pass, with **three booleans rather than a stack**.
+///
+/// That choice is what makes streaming flicker-free: an opening marker with no
+/// closer yet simply leaves its flag on to the end of the block, so `I feel
+/// **that` renders bold immediately and the arriving `**` changes nothing on
+/// screen. A stack would have to wait for the closer, show the marker
+/// literally meanwhile, and snap.
+List<InlineSpan> _parseInline(
+  String source,
+  TextStyle base,
+  LevColors c, {
+  required bool caret,
+}) {
+  final spans = <InlineSpan>[];
+  final buffer = StringBuffer();
+  var bold = false;
+  var italic = false;
+  var code = false;
+
+  void flush() {
+    if (buffer.isEmpty) return;
+    var s = base;
+    if (bold) s = s.copyWith(fontWeight: _bold);
+    if (italic) s = s.copyWith(fontStyle: FontStyle.italic);
+    if (code) s = s.copyWith(backgroundColor: c.line, letterSpacing: 0);
+    spans.add(TextSpan(text: buffer.toString(), style: s));
+    buffer.clear();
+  }
+
+  var i = 0;
+  while (i < source.length) {
+    final ch = source[i];
+
+    if (ch == r'\' &&
+        i + 1 < source.length &&
+        _escapable.contains(source[i + 1])) {
+      buffer.write(source[i + 1]);
+      i += 2;
+      continue;
+    }
+
+    if (ch == '`') {
+      final run = _runLength(source, i);
+      // A run of anything but one backtick is literal, which is how a ``` fence
+      // line falls through harmlessly instead of swallowing the rest of a reply.
+      if (run != 1) {
+        buffer.write('`' * run);
+        i += run;
+        continue;
+      }
+      flush();
+      code = !code;
+      i += 1;
+      continue;
+    }
+
+    // Code is verbatim: `a * b` must not come out with a * missing.
+    if (code) {
+      buffer.write(ch);
+      i += 1;
+      continue;
+    }
+
+    if (ch == '*' || ch == '_') {
+      final run = _runLength(source, i);
+      final take = run >= 2 ? 2 : 1;
+      final opening = take == 2 ? !bold : !italic;
+      if (_flanks(source, i, take, opening: opening, marker: ch)) {
+        flush();
+        if (take == 2) {
+          bold = !bold;
+        } else {
+          italic = !italic;
+        }
+        i += take;
+        continue;
+      }
+      buffer.write(ch * run);
+      i += run;
+      continue;
+    }
+
+    buffer.write(ch);
+    i += 1;
+  }
+
+  flush();
+  // A plain `TextSpan`, never a `WidgetSpan`: a placeholder would put U+FFFC
+  // into `toPlainText()` and break every `find.text` against a bubble.
+  if (caret) spans.add(TextSpan(text: _caret, style: base));
+  return spans;
+}
+
+int _runLength(String source, int start) {
+  final ch = source[start];
+  var n = 1;
+  while (start + n < source.length && source[start + n] == ch) {
+    n += 1;
+  }
+  return n;
+}
+
+/// Whether a marker at [i] is really emphasis and not arithmetic.
+///
+/// An opener must be followed by a non-space, a closer preceded by one — so
+/// `5 * 3 = 15` keeps its asterisk. `_` is stricter still, requiring its outer
+/// neighbour to be a non-word character, so `snake_case_name` survives intact.
+bool _flanks(
+  String source,
+  int i,
+  int take, {
+  required bool opening,
+  required String marker,
+}) {
+  final before = i > 0 ? source[i - 1] : null;
+  final after = i + take < source.length ? source[i + take] : null;
+
+  if (opening) {
+    if (after == null || after.trim().isEmpty) return false;
+    if (marker == '_' && before != null && _wordChar.hasMatch(before)) {
+      return false;
+    }
+    return true;
+  }
+
+  if (before == null || before.trim().isEmpty) return false;
+  if (marker == '_' && after != null && _wordChar.hasMatch(after)) return false;
+  return true;
+}
+
+/// Reveals a growing string at reading speed.
+///
+/// This exists because a local model does not produce text evenly: it stalls on
+/// a cache miss and then bursts. Rendering arrival directly reads as stuttering
+/// even when it is fast. Here display is decoupled from arrival — text that has
+/// landed waits in [text] and is let out at a steady rate.
+///
+/// **Display only.** What is revealed never feeds back into what is stored, or
+/// a saved conversation would depend on animation timing and a reader with
+/// reduced motion would end up with a different transcript.
+class _LevReveal extends StatefulWidget {
+  const _LevReveal({required this.text, required this.builder});
+
+  final String text;
+  final Widget Function(BuildContext context, String revealed) builder;
+
+  @override
+  State<_LevReveal> createState() => _LevRevealState();
+}
+
+class _LevRevealState extends State<_LevReveal>
+    with SingleTickerProviderStateMixin {
+  /// The floor: comfortably faster than any reply this model produces, so on a
+  /// phone the reveal is never structurally behind — it only spreads each
+  /// arriving token over a frame or two.
+  static const double _floorCps = 220;
+
+  /// Drain whatever has arrived over this long. Bounds the backlog, and with it
+  /// the jump when the finished reply replaces the streaming bubble.
+  static const double _tauSeconds = 0.06;
+
+  /// ~30 Hz. Growth at 30 Hz reads as continuous, and text relayout is the one
+  /// real cost here — it runs while llama.cpp is saturating the same CPU.
+  static const Duration _minInterval = Duration(milliseconds: 32);
+
+  // A raw `Ticker`, not an `AnimationController`: there is no bounded 0→1
+  // animation here because the target moves, and `repeat()` never ends — which
+  // would hang every `pumpAndSettle` in the suite. This one runs only while
+  // there is backlog.
+  late final _ticker = createTicker(_onTick);
+
+  int _shown = 0;
+  Duration _last = Duration.zero;
+  Duration _lastReveal = Duration.zero;
+  bool _revealedAny = false;
+  double _carry = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Here rather than `initState` because `reduceMotion` reads an inherited
+    // `MediaQuery` — the same reason `LevTypingIndicator` starts here.
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(_LevReveal old) {
+    super.didUpdateWidget(old);
+    // Growth continues where it left off; a replacement jumps to the end.
+    // Restarting on text that is not an extension of what is on screen would
+    // replay a message the reader has already read.
+    final onScreen = old.text.substring(0, math.min(_shown, old.text.length));
+    if (!widget.text.startsWith(onScreen)) _shown = widget.text.length;
+    _shown = math.min(_shown, widget.text.length);
+    _sync();
+  }
+
+  void _sync() {
+    if (reduceMotion(context)) {
+      _shown = widget.text.length;
+      _stop();
+      return;
+    }
+    if (_shown < widget.text.length) {
+      // Never render an empty bubble: the first grapheme is free.
+      if (_shown == 0) _shown = _advance(widget.text, 0, 1);
+      _start();
+    } else {
+      _stop();
+    }
+  }
+
+  void _start() {
+    if (_ticker.isActive) return;
+    _reset();
+    _ticker.start();
+  }
+
+  void _stop() {
+    if (_ticker.isActive) _ticker.stop();
+    _reset();
+  }
+
+  // `Ticker.stop()` clears its start time, so elapsed begins from zero again on
+  // the next start. A stale `_last` would then produce a large negative `dt`.
+  void _reset() {
+    _last = Duration.zero;
+    _lastReveal = Duration.zero;
+    _revealedAny = false;
+    _carry = 0;
+  }
+
+  void _onTick(Duration elapsed) {
+    final backlog = widget.text.length - _shown;
+    if (backlog <= 0) {
+      _stop();
+      return;
+    }
+
+    final dt = (elapsed - _last).inMicroseconds / Duration.microsecondsPerSecond;
+    _last = elapsed;
+    if (dt <= 0) return;
+
+    // Drain the backlog over `_tau`, but never slower than the floor. Expressed
+    // per second rather than per frame so the reveal runs at the same speed
+    // whatever the frame rate — including under a test's 100 ms pumps.
+    _carry += math.max(_floorCps, backlog / _tauSeconds) * dt;
+    if (_carry < 1) return;
+    if (_revealedAny && elapsed - _lastReveal < _minInterval) return;
+
+    final step = _carry.floor();
+    _carry -= step;
+    _lastReveal = elapsed;
+    _revealedAny = true;
+    setState(() => _shown = _advance(widget.text, _shown, step));
+    if (_shown >= widget.text.length) _stop();
+  }
+
+  /// Advances by whole grapheme clusters. Slicing by code unit would split a
+  /// surrogate pair or strand Hebrew niqqud from its letter for a frame.
+  static int _advance(String text, int from, int step) {
+    final tail = text.substring(from);
+    return from + tail.characters.take(step).string.length;
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, widget.text.substring(0, _shown));
 }
 
 /// Three dots: the model is writing.

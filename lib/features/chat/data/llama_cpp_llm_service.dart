@@ -241,6 +241,17 @@ class _LlamaCppSession implements LlmSession {
                 // of the conversation — the exact cost §5.1 introduces sessions
                 // to avoid.
                 reusePromptPrefix: true,
+                // One token per port message, against llamadart's default of
+                // eight. Its worker isolate batches token pieces before sending
+                // them (`NativeTokenStreamBatcher`), so a reply arrives in
+                // bursts of eight tokens rather than as writing. The batching
+                // buys nothing at this scale: a 4-bit Qwen produces 8–20 tokens
+                // a second on a phone, which is 20 messages a second, not 2000.
+                // Splitting a multi-byte character across chunks is safe — the
+                // engine decodes the whole stream through one chunked
+                // `Utf8Decoder`, which carries its state across chunk
+                // boundaries.
+                streamBatchTokenThreshold: 1,
               ),
             )
             .listen(

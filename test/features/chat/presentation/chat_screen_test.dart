@@ -82,6 +82,55 @@ void main() {
       tokenDelay: const Duration(milliseconds: 10),
       replies: ['one two three four five six']);
 
+  // What the test above promises in its name but never actually checks: not
+  // merely that a bubble is marked as arriving, but that what it shows is a
+  // *prefix* — the reply being written rather than pasted in whole.
+  chatWidgetTest('the streaming bubble shows a prefix, never the whole reply',
+      (tester, harness) async {
+    final id = await conversationIn(harness);
+
+    await harness.pump(tester, ChatScreen(conversationId: id));
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump(const Duration(milliseconds: 30));
+
+    const reply = 'a slow steady sentence that takes a while to arrive';
+    final bubble = find.byKey(const ValueKey('lev.chat.streaming'));
+    expect(bubble, findsOneWidget);
+
+    final shown = tester
+        .widgetList<Text>(
+          find.descendant(of: bubble, matching: find.byType(Text)),
+        )
+        .map((t) => t.data ?? t.textSpan?.toPlainText() ?? '')
+        .join()
+        .replaceAll('▌', '');
+
+    expect(shown, isNotEmpty, reason: 'the bubble must never render empty');
+    expect(shown.length, lessThan(reply.length));
+    expect(reply, startsWith(shown),
+        reason: 'the bubble must show a prefix of the reply, not a jump');
+
+    await tester.pumpAndSettle();
+    expect(find.text(reply), findsOneWidget);
+  },
+      tokenDelay: const Duration(milliseconds: 10),
+      replies: ['a slow steady sentence that takes a while to arrive']);
+
+  chatWidgetTest("the model's markdown is rendered; the user's is not",
+      (tester, harness) async {
+    final id = await conversationIn(harness);
+
+    await harness.pump(tester, ChatScreen(conversationId: id));
+    await send(tester, '**not bold**');
+
+    // Hers is quoted back exactly as she typed it.
+    expect(find.text('**not bold**'), findsOneWidget);
+    // His is read.
+    expect(find.text('I hear you.'), findsOneWidget);
+    expect(find.text('I hear **you**.'), findsNothing);
+  }, replies: ['I hear **you**.']);
+
   chatWidgetTest('a multi-turn conversation keeps every turn',
       (tester, harness) async {
     final id = await conversationIn(harness);

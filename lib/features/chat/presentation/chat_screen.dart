@@ -311,8 +311,17 @@ class _Conversation extends ConsumerWidget {
       if (state.failure != null)
         _TruncatedNotice(onRetry: notifier.retryLastTurn),
       if (showDots) LevTypingIndicator(semanticsLabel: l10n.chatTyping),
+      // Keyed so the reveal's state can only ever be the streaming bubble's.
+      // `LevBubble` serves both roles with no key, so a future reordering of
+      // this list could otherwise graft a history bubble's element — and its
+      // reveal progress — onto the reply in flight.
       if (streaming)
-        LevBubble(text: state.streamingText, fromUser: false, isStreaming: true),
+        LevBubble(
+          key: const ValueKey('lev.chat.streaming'),
+          text: state.streamingText,
+          fromUser: false,
+          isStreaming: true,
+        ),
       // Alongside the reply, never in its place. It sits inside the scroll,
       // between the message and the answer — a modal here would stop the screen
       // at the most vulnerable possible moment.

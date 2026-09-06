@@ -100,6 +100,27 @@ void main() {
     );
   });
 
+  // llamadart's worker isolate batches token pieces before sending them, and
+  // its default of eight is what made a reply arrive in visible bursts rather
+  // than as writing. This is the only place that choice can be asserted without
+  // a device: the batcher itself lives behind the isolate.
+  test('tokens cross the port one at a time, not in batches of eight',
+      () async {
+    final session = await service.openSession(seed: _seed);
+    final tokens = session.send(_turn('hello')).toList();
+
+    generation
+      ..add('Hi.')
+      ..close();
+    await tokens;
+
+    final params = verify(
+      () => engine.generate(any(), params: captureAny(named: 'params')),
+    ).captured.single as llama.GenerationParams;
+
+    expect(params.streamBatchTokenThreshold, 1);
+  });
+
   group('the transcript', () {
     test('the first turn is prefixed by the seed', () async {
       final session = await service.openSession(seed: _seed);

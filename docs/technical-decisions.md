@@ -1422,6 +1422,123 @@ the two tests covering it now assert.
 
 ---
 
+## #31 — The reply is revealed at reading speed, and its markdown is parsed in-house
+
+**Status:** Accepted
+
+**Decision.** Three changes, in one direction: the reply should read as being
+*written*.
+
+1. `LlamaCppLlmService` passes **`streamBatchTokenThreshold: 1`**, against
+   llamadart's default of 8.
+2. A private `_LevReveal` in `lev_widgets.dart` decouples display from arrival,
+   revealing text at `max(220 cps, backlog / 60 ms)` on a raw `Ticker` that runs
+   **only while there is backlog**.
+3. A new `LevMarkdownText` renders a deliberately small markdown subset —
+   `**bold**`, `*italic*`, `` `code` ``, headings-as-bold, bullets and numbered
+   items — with **no new dependency**. It is used for the model's prose only;
+   what the user typed is never parsed.
+
+**Rationale.**
+
+*On the threshold.* llamadart's worker isolate accumulates token pieces in
+`NativeTokenStreamBatcher` before sending them over the port, and its default of
+8 is why a reply arrived in visible bursts of roughly thirty characters. The
+batching is buying isolate messages that were never scarce: a 4-bit Qwen
+produces 8–20 tokens a second on a phone, so the cost it avoids is twenty
+messages a second, not two thousand. Splitting a multi-byte character across
+chunks is safe — `engine.dart` decodes the whole stream through **one** chunked
+`Utf8Decoder`, whose DFA state carries across chunk boundaries, so Hebrew and
+emoji survive the finer granularity. llamadart itself passes `1` for speech.
+
+*On revealing rather than rendering arrival.* Token-by-token is necessary and
+not sufficient: llama.cpp stalls on a cache miss and then bursts, so arrival is
+jittery even when it is fast, and rendering it directly reads as stuttering.
+Draining a backlog at a steady rate is what turns that into writing. The rate is
+expressed per second and driven by the ticker's elapsed time rather than per
+frame, so the reveal runs at one speed whatever the frame rate — including under
+a test's 100 ms pumps.
+
+*On the ticker stopping.* This is the load-bearing constraint, and it is a
+testing one. `pumpAndSettle` is `do { pump } while (hasScheduledFrame)`, so an
+animation that never ends hangs the suite. An `AnimationController.repeat()`
+would; there is also no bounded 0→1 animation to express here, because the
+target moves. A raw `Ticker` started on backlog and stopped at zero is both the
+honest description and the only one that terminates.
+
+*On three booleans instead of a parsing stack.* This is what makes streaming
+flicker-free. A stack has to wait for a closing marker, which means showing
+`**that` literally until the second `**` arrives and then snapping to bold. With
+toggles, a dangling opener simply takes effect and closes at the end of the
+block, so the closer's arrival changes nothing on screen. Two rules complete it:
+flanking, so `5 * 3 = 15` and `snake_case_name` keep their punctuation; and
+clipping a marker run left dangling at the tail while streaming, so a prefix
+ending in a half-typed `**` never shows a stray asterisk for one frame.
+
+*On writing the parser rather than adding a package.* The subset a 0.5B
+supportive model actually emits is small, and the parts a markdown package
+exists to provide are the parts this product must not have: links are already
+rejected (#25 — in an application with no network, a link is a dead button),
+and tables and images have no place in a chat bubble. Mapping a third-party
+widget's theming onto `LevColors`/`LevSpace` would be about as much code as the
+parser, and design rule 3 puts a missing component in `lev_widgets.dart`
+regardless. The fallback is total: anything outside the subset renders character
+for character, which is exactly what the bubble did before this change.
+
+**Rejected alternatives.**
+
+- *Leave the threshold at 8 and only add the reveal* — the smoothing would hide
+  the burstiness. Rejected: it treats the symptom, and it forces the reveal to
+  run 30 characters behind arrival, which is the end-of-reply jump made worse on
+  purpose.
+- *Carry the reveal's progress across the swap to the stored message, so there
+  is no jump at all* — it would work, and only by accident: the streaming bubble
+  and the newly stored message both land at index 0, so the element is reused.
+  Rejected because it makes correctness depend on index arithmetic in a list
+  that is explicitly designed to change length, and because `_finishGeneration`
+  trims the reply — so when the first token is whitespace the stored text is not
+  an extension of the streamed text and the guard jumps to full anyway. The jump
+  is bounded instead (0–3 characters on a phone; it scales with the model's
+  speed, not with the reply's length).
+- *A blinking caret* — every other chat has one. Rejected: it is an animation
+  that never ends, so it would hang `pumpAndSettle` wherever a reply is in
+  flight. The static `▌` already distinguishes a paused stream from a finished
+  short reply, which is the whole job.
+- *`flutter_markdown` or a community fork* — less code to own. Rejected on the
+  reasoning above; reversible if the subset ever needs to grow.
+- *Splitting the bubble into a settled prefix and a growing tail, to avoid
+  re-laying-out the whole paragraph* — the obvious optimisation. Rejected: two
+  paragraphs cannot line-wrap as one, so the seam would be visibly wrong.
+  Re-parsing the prefix each update costs tens of microseconds; the cost that is
+  real is text layout, and that is bounded by capping updates at ~30 Hz instead.
+
+**Consequence — and one thing that must be checked on a device.**
+
+The reveal is **display only and must never feed back into what is stored**.
+`cancel()` already persists `streamingText` — the text that *arrived* — and that
+must stay so: storing the revealed prefix would make a saved conversation depend
+on animation timing, and a reader with reduced motion would end up with a
+different transcript from one without.
+
+`LevMarkdownText` carries an invariant that `find.text` depends on and that
+`test/core/widgets/lev_markdown_test.dart` pins: **for a single-paragraph source
+with no valid marker, the rendered plain text is byte-identical to the source**,
+in one bare `Text.rich` with no wrapper. `find.text` matches a `Text` carrying a
+`textSpan` via `toPlainText()` but ignores a standalone `RichText`, so building
+it any other way would silently stop every existing assertion against a bubble
+from matching. For the same reason no span may carry a `semanticsLabel` and no
+`WidgetSpan` may be used — both rewrite `toPlainText()`.
+
+**Open, for a physical device.** Two numbers here are estimates. First, text
+relayout at 30 Hz happens while llama.cpp saturates the same CPU; if the profile
+overlay shows frames over 16 ms on the oldest target phone, `_minInterval` goes
+to 50 ms. Second, **IBM Plex Sans Hebrew ships no italic face** (#26 bundles five
+upright weights), so whether `FontStyle.italic` slants at all depends on what the
+renderer synthesises. If it does not, italic becomes `FontWeight.w500` — a step
+that is guaranteed to exist in the bundle.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).
