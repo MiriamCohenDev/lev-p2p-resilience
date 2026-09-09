@@ -23,16 +23,26 @@ import 'widgets/conversation_history.dart';
 
 /// The supportive conversation (technical-spec §5.1).
 ///
-/// Opens straight into a conversation. The history is a drawer on mobile and a
-/// permanent column on desktop — the same `ConversationHistory` widget in both,
-/// handed to [LevShell.sideList].
+/// The history is a drawer on mobile and a permanent column on desktop — the
+/// same `ConversationHistory` widget in both, handed to [LevShell.sideList].
 class ChatScreen extends ConsumerWidget {
-  const ChatScreen({this.conversationId, super.key});
+  const ChatScreen({this.conversationId, this.initialMessage, super.key});
 
-  /// `null` on `/chat`: nothing chosen, so one is opened — see
-  /// `openBlankConversation`. It is a moment on the way into a conversation
-  /// rather than a screen of its own.
+  /// `null` on `/chat`: a conversation that does not exist yet.
+  ///
+  /// That is a screen of its own now, not a moment on the way into one
+  /// (technical-decisions #34) — a composer with nothing behind it, which is
+  /// what entering the chat actually is until something has been said.
   final String? conversationId;
+
+  /// The message that brought us here, on the way in from the draft.
+  ///
+  /// Carried as `GoRouterState.extra` rather than through a provider, because
+  /// `/chat` and `/chat/:id` are two different route builders under two
+  /// different [ProviderScope]s: plain constructor data crosses that boundary
+  /// with nothing to reason about. Sent once, by `_ChatBody`, as soon as the
+  /// session is open.
+  final String? initialMessage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,15 +54,19 @@ class ChatScreen extends ConsumerWidget {
       overrides: [
         safetyLocaleProvider.overrideWithValue(Localizations.localeOf(context)),
       ],
-      child: _ChatShell(conversationId: conversationId),
+      child: _ChatShell(
+        conversationId: conversationId,
+        initialMessage: initialMessage,
+      ),
     );
   }
 }
 
 class _ChatShell extends ConsumerWidget {
-  const _ChatShell({required this.conversationId});
+  const _ChatShell({required this.conversationId, this.initialMessage});
 
   final String? conversationId;
+  final String? initialMessage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,13 +89,20 @@ class _ChatShell extends ConsumerWidget {
       ),
       appBarActions: [
         IconButton(
-          onPressed: () => _startConversation(context, ref),
+          // Goes to the empty draft; it creates nothing. Pressing "new" and
+          // crossing into the tab now mean the same thing, because the thing
+          // they used to differ about — an untitled row in the history — is
+          // exactly what #34 removed.
+          onPressed: () => context.go(AppRoutes.chat),
           icon: const Icon(Icons.edit_outlined),
           tooltip: l10n.conversationsNew,
         ),
       ],
       onOpenSettings: () => context.push(AppRoutes.settings),
-      body: _ChatBody(conversationId: conversationId),
+      body: _ChatBody(
+        conversationId: conversationId,
+        initialMessage: initialMessage,
+      ),
     );
   }
 
@@ -110,12 +131,6 @@ class _ChatShell extends ConsumerWidget {
     }
     return null;
   }
-
-  Future<void> _startConversation(BuildContext context, WidgetRef ref) async {
-    final id = await startConversation(ref);
-    if (!context.mounted) return;
-    context.go(AppRoutes.conversation(id));
-  }
 }
 
 /// Everything between the bar and the bottom of the screen.
@@ -124,24 +139,43 @@ class _ChatShell extends ConsumerWidget {
 /// (design stage 6): the model's one-off preparation is a whole screen, the
 /// session's prefill is a line that hides nothing, and the model writing is
 /// three dots. A progress bar over a one-second wait feels slower than nothing.
-class _ChatBody extends ConsumerWidget {
-  const _ChatBody({required this.conversationId});
+class _ChatBody extends ConsumerStatefulWidget {
+  const _ChatBody({required this.conversationId, this.initialMessage});
 
   final String? conversationId;
+  final String? initialMessage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ChatBody> createState() => _ChatBodyState();
+}
+
+class _ChatBodyState extends ConsumerState<_ChatBody> {
+  /// Whether the message carried in from the draft has been handed to the
+  /// notifier. Held here rather than in `_Conversation` because this element
+  /// survives the loading → data rebuild that builds `_Conversation` for the
+  /// first time.
+  bool _sentInitial = false;
+
+  @override
+  void didUpdateWidget(_ChatBody old) {
+    super.didUpdateWidget(old);
+    // A different conversation in the same slot is a different message to send.
+    // Every path that creates one goes through `/chat` first, which pops this
+    // page, so this should not arise — but the failure it guards against is a
+    // message silently dropped, and that is not a thing to leave to routing.
+    if (old.conversationId != widget.conversationId) _sentInitial = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    // Nothing chosen: open a conversation rather than offering a button that
-    // asks the user to confirm what opening the chat already said. Ahead of the
-    // engine check on purpose — a conversation is created out of storage, not
-    // out of a model, so it opens while the weights are still loading and the
-    // model's own wait is shown inside it.
-    final id = conversationId;
-    if (id == null) return const _OpeningConversation();
-
-    // Then the engine: its failures are the ones with something specific to say.
+    // The engine first, in both states. It used to come second, so that a
+    // conversation — which is created out of storage, not out of a model —
+    // could be opened while the weights loaded. Nothing is created here any
+    // more, and the one thing the draft does need is the model, so loading it
+    // the moment the tab is entered is what keeps the first reply as close as
+    // it can be to the one before it (#34).
     final engine = ref.watch(llmServiceProvider);
     if (engine.isLoading) return const _ModelPreparing();
     if (engine.hasError) {
@@ -150,6 +184,11 @@ class _ChatBody extends ConsumerWidget {
         onRetry: () => ref.invalidate(llmServiceProvider),
       );
     }
+
+    // Nothing chosen: a conversation that does not exist yet, and will not until
+    // something is said in it.
+    final id = widget.conversationId;
+    if (id == null) return const _DraftConversation();
 
     final chat = ref.watch(chatNotifierProvider(id));
 
@@ -172,27 +211,60 @@ class _ChatBody extends ConsumerWidget {
           ),
         ),
       ),
-      data: (state) => _Conversation(conversationId: id, state: state),
+      data: (state) {
+        _sendInitialMessage(id, state);
+        return _Conversation(conversationId: id, state: state);
+      },
     );
+  }
+
+  /// Sends the message the draft was carrying, once the session is open.
+  ///
+  /// The draft has no session to send through — there was no conversation to
+  /// open one for — so the message crosses the navigation and is sent here, at
+  /// the first moment there is anything to send it with.
+  ///
+  /// Two guards, and they cover different failures. [_sentInitial] stops a
+  /// second dispatch across the rebuilds of one screen; `messages.isEmpty` stops
+  /// it even if this state object is replaced, because by then the message it
+  /// was carrying is already in the conversation. A duplicate here would say
+  /// something the user said once, twice.
+  void _sendInitialMessage(String id, ChatState state) {
+    final text = widget.initialMessage;
+    if (text == null || _sentInitial || state.messages.isNotEmpty) return;
+    _sentInitial = true;
+
+    // After the frame: this runs inside `build`, and a notifier must not be
+    // written to while the tree that reads it is being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(chatNotifierProvider(id).notifier).send(text));
+    });
   }
 }
 
-/// `/chat` with nothing chosen: a conversation on its way in.
+/// `/chat` with nothing chosen: a conversation that does not exist yet.
 ///
-/// Stateful because opening is asynchronous and must happen exactly **once**.
-/// Starting it from `build` would start it again on every rebuild, and the list
-/// this writes to is watched by the drawer beside it — so each new conversation
-/// would rebuild this screen, which would create another.
-class _OpeningConversation extends ConsumerStatefulWidget {
-  const _OpeningConversation();
+/// **Nothing is created by arriving here** (technical-decisions #34). The screen
+/// is the same invitation and the same composer an empty conversation shows —
+/// what is missing is the row in the history, which is the point: opening a tab
+/// is not starting a conversation, sending a prompt is.
+///
+/// Stateful for the moment between the two: creating the conversation is a write
+/// to the encrypted database, and it can fail.
+class _DraftConversation extends ConsumerStatefulWidget {
+  const _DraftConversation();
 
   @override
-  ConsumerState<_OpeningConversation> createState() =>
-      _OpeningConversationState();
+  ConsumerState<_DraftConversation> createState() => _DraftConversationState();
 }
 
-class _OpeningConversationState extends ConsumerState<_OpeningConversation> {
-  /// Why the conversation could not be opened, once that has happened.
+class _DraftConversationState extends ConsumerState<_DraftConversation> {
+  /// The conversation is being created. Brief, and covered by the composer's own
+  /// busy state rather than by a screen of its own.
+  bool _isCreating = false;
+
+  /// Why it could not be created, once that has happened.
   ///
   /// Only storage can fail here — a model that cannot be resolved does not stop
   /// a conversation being created (see [startConversation]) — and a chat that
@@ -201,45 +273,80 @@ class _OpeningConversationState extends ConsumerState<_OpeningConversation> {
   /// conversation itself uses when its history cannot be read.
   Object? _failure;
 
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_open());
-  }
+  /// What the user typed, kept for that retry. The composer clears its field on
+  /// submit, so without this a storage failure would also lose the message.
+  String? _pending;
 
-  Future<void> _open() async {
+  Future<void> _send(String text) async {
+    setState(() {
+      _pending = text;
+      _failure = null;
+      _isCreating = true;
+    });
+
     try {
-      final id = await openBlankConversation(ref);
+      final id = await startConversation(ref);
       if (!mounted) return;
-      context.go(AppRoutes.conversation(id));
+      context.go(AppRoutes.conversation(id), extra: text);
+      // Cleared even though we are leaving: `/chat` stays mounted underneath
+      // `/chat/<id>` — go_router builds a page per matched route — so this same
+      // state object is what comes back when the conversation is deleted or a
+      // new one is started. Left set, it would strand the composer on its stop
+      // button.
+      setState(() {
+        _pending = null;
+        _isCreating = false;
+      });
     } on Object catch (failure) {
       if (!mounted) return;
-      setState(() => _failure = failure);
+      setState(() {
+        _failure = failure;
+        _isCreating = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_failure == null) return const _PreparingSession();
-
     final l10n = AppLocalizations.of(context);
-    return LevEmptyState(
-      icon: Icons.error_outline,
-      tone: LevTone.warning,
-      title: l10n.chatLoadFailed,
-      body: l10n.chatTruncatedBody,
-      footnote: l10n.aidStillWorks,
-      action: SizedBox(
-        width: 240,
-        child: LevButton(
-          label: l10n.retry,
-          kind: LevButtonKind.secondary,
-          onPressed: () {
-            setState(() => _failure = null);
-            unawaited(_open());
-          },
+
+    if (_failure != null) {
+      return LevEmptyState(
+        icon: Icons.error_outline,
+        tone: LevTone.warning,
+        title: l10n.chatLoadFailed,
+        body: l10n.chatTruncatedBody,
+        footnote: l10n.aidStillWorks,
+        action: SizedBox(
+          width: 240,
+          child: LevButton(
+            label: l10n.retry,
+            kind: LevButtonKind.secondary,
+            onPressed: () => unawaited(_send(_pending ?? '')),
+          ),
         ),
-      ),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: LevEmptyState(
+            icon: Icons.chat_bubble_outline,
+            title: l10n.conversationsEmptyTitle,
+            body: l10n.conversationsEmptyBody,
+          ),
+        ),
+        ChatComposer(
+          isBusy: _isCreating,
+          enabled: true,
+          onSend: (text) => unawaited(_send(text)),
+          // Nothing is generating yet, so there is nothing to stop. The composer
+          // only offers the stop button while `isBusy`, which here is the
+          // fraction of a second the write takes.
+          onStop: () {},
+        ),
+      ],
     );
   }
 }
@@ -248,8 +355,12 @@ class _OpeningConversationState extends ConsumerState<_OpeningConversation> {
 ///
 /// §8: the prefill must be visible, and a blank or frozen screen is a defect. It
 /// is a labelled line rather than a bare spinner, over a composer that is
-/// visibly not ready yet. Shared by the two waits that end in the same place —
-/// the session prefilling, and a conversation being opened for `/chat`.
+/// visibly not ready yet.
+///
+/// This is where the cost of #34 lands: with no conversation to open a session
+/// for, the prefill can no longer start when the tab is entered, so it happens
+/// here — between the first message being sent and its reply beginning. The
+/// model's own load, which is the larger wait, still starts on arrival.
 class _PreparingSession extends StatelessWidget {
   const _PreparingSession();
 

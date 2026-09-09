@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lev/core/l10n/app_localizations.dart';
 import 'package:lev/core/widgets/lev_widgets.dart';
 import 'package:lev/features/chat/domain/message.dart';
+import 'package:lev/features/chat/presentation/widgets/chat_composer.dart';
 import 'package:lev/features/chat/presentation/widgets/conversation_history.dart';
 
 import '../../../support/chat_harness.dart';
@@ -91,10 +92,16 @@ void main() {
 
   chatWidgetTest('creating a conversation stamps the active model',
       (tester, harness) async {
-    // The whole app, because creating one navigates into it and `context.go`
-    // needs a router above the screen.
+    // The whole app, because the conversation is created on the way from the
+    // draft into itself and `context.go` needs a router above the screen.
     await harness.pumpApp(tester);
     await tester.tap(find.text(l10n.homeStartChat));
+    await tester.pumpAndSettle();
+
+    // Home's button lands on the draft and creates nothing (#34); the message
+    // is what creates it.
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pumpAndSettle();
 
     // A one-shot query, not `watchConversations().first`. Awaiting `.first`
@@ -156,6 +163,110 @@ void main() {
     // The row survives as a tombstone; its content does not
     // (technical-decisions #15).
     expect(await harness.repository.messagesOf(conversation.id), isEmpty);
+  });
+
+  /// Deleting the conversation you are looking at (technical-decisions #34).
+  ///
+  /// The whole app, because the assertion is about where you end up. These run
+  /// on the mobile layout, so the list is the drawer and reaching it is a tap on
+  /// the handle the `Scaffold` puts in the bar.
+  group('deleting the conversation you are on', () {
+    Future<void> openChat(WidgetTester tester) async {
+      await tester.tap(find.text(l10n.navChat));
+      await tester.pumpAndSettle();
+    }
+
+    /// The composer's field, not the drawer's search box — deleting a
+    /// conversation you are not on leaves the drawer open, so a bare
+    /// `find.byType(TextField)` is two widgets from then on.
+    final composerField = find.descendant(
+      of: find.byType(ChatComposer),
+      matching: find.byType(TextField),
+    );
+
+    Future<void> send(WidgetTester tester, String text) async {
+      await tester.enterText(composerField, text);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> deleteFromDrawer(WidgetTester tester, String title) async {
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      // Scoped to the drawer: a conversation's title is also its bar's title and
+      // — since it is derived from the opening message — a bubble in it, so a
+      // bare `find.text` here matches three widgets, all of them correct.
+      await tester.longPress(
+        find.descendant(of: find.byType(Drawer), matching: find.text(title)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.conversationDelete));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.conversationDelete).last);
+      await tester.pumpAndSettle();
+    }
+
+    chatWidgetTest('lands back on the composer, with nothing behind it',
+        (tester, harness) async {
+      await harness.pumpApp(tester);
+      await openChat(tester);
+      await send(tester, 'goodbye');
+
+      await deleteFromDrawer(tester, 'goodbye');
+
+      // Exactly where entering the chat leaves you: somewhere to type, and no
+      // conversation. Not the blank screen the deleted conversation used to
+      // leave behind.
+      expect(find.byType(ChatComposer), findsOneWidget);
+      expect(find.text(l10n.conversationsEmptyTitle), findsWidgets);
+      expect(find.text('goodbye'), findsNothing);
+
+      // And writing again starts a second conversation rather than resurrecting
+      // the tombstone.
+      await send(tester, 'starting over');
+      final live = (await harness.conversations())
+          .where((c) => !c.isDeleted)
+          .toList();
+      expect(live, hasLength(1));
+      expect(live.single.title, 'starting over');
+    }, replies: ['ok']);
+
+    chatWidgetTest('the same when it is the last one left',
+        (tester, harness) async {
+      await harness.pumpApp(tester);
+      await openChat(tester);
+      await send(tester, 'first');
+
+      // A second, so the first delete has somewhere it could plausibly fall
+      // back to — and does not.
+      await openChat(tester);
+      await send(tester, 'second');
+
+      await deleteFromDrawer(tester, 'second');
+      expect(find.byType(ChatComposer), findsOneWidget);
+      expect(find.text('first'), findsNothing,
+          reason: 'the newest survivor must not be opened in its place');
+
+      // From the draft, so this one is a conversation we are *not* on — and it
+      // is the last that existed. Nothing about that is a special case.
+      await deleteFromDrawer(tester, 'first');
+      expect(find.byType(ChatComposer), findsOneWidget);
+      expect(find.text(l10n.conversationsEmptyTitle), findsWidgets);
+    }, replies: ['ok']);
+
+    chatWidgetTest('deleting one you are not on leaves you where you are',
+        (tester, harness) async {
+      await harness.pumpApp(tester);
+      await openChat(tester);
+      await send(tester, 'the other one');
+      await openChat(tester);
+      await send(tester, 'the open one');
+
+      await deleteFromDrawer(tester, 'the other one');
+
+      // Still in the conversation that was open, with its history intact.
+      expect(find.text('the open one'), findsWidgets);
+    }, replies: ['ok']);
   });
 
   group('finding the menu', () {

@@ -1541,8 +1541,8 @@ that is guaranteed to exist in the bundle.
 
 ## #32 — The chat opens a conversation, and reuses a blank one
 
-**Status:** Accepted — supersedes the "shows the empty state rather than
-redirecting" half of `AppRoutes.chat`
+**Status:** **Superseded by #34** — it supersedes, in turn, the "shows the empty
+state rather than redirecting" half of `AppRoutes.chat`
 
 **Decision.** `/chat` no longer shows an empty state with a "start a
 conversation" button. It opens a conversation and moves to `/chat/<id>`. Which
@@ -1771,6 +1771,101 @@ Two findings worth keeping:
   about OpenSSL, because which OpenSSL version the hook links has not been
   established. **Open for Phase 5**, alongside the packaging and licensing note
   #13 already flags.
+
+---
+
+## #34 — A conversation is created by its first message, and by nothing else
+
+**Status:** Accepted — supersedes #32
+
+**Decision.** `/chat` is a screen: the invitation and the composer, with no
+conversation behind them. **Sending the first message is what creates the
+conversation**, after which the screen moves to `/chat/<id>` carrying that message
+as `GoRouterState.extra`, and `_ChatBody` hands it to the notifier as soon as the
+session is open. `startConversation` keeps exactly that one caller — the app-bar
+"new conversation", the drawer's button and Home's primary action all go to
+`/chat` and create nothing. Deleting the conversation you are on goes to `/chat`
+too. `openBlankConversation` and `ChatRepository.latestConversation` are deleted.
+
+**Rationale.**
+
+*On not creating one on arrival.* #32 was right that the empty state with a
+button asked the user to confirm what opening the chat had already said, and
+wrong about what to do instead. Chat is a permanent destination in the bar (#22),
+so it is crossed on the way elsewhere — and #32's own mitigation admits the
+problem it could not solve: reuse hides the row, it does not stop it existing.
+The moment anything is created after it, that untitled row is in the history for
+good. Opening a tab is not starting a conversation. Saying something is.
+
+*On the message being what creates it.* It is also the only moment the row can be
+honestly filled in. The title is derived from the opening message, so a
+conversation created before there is one is a row that cannot yet say what it is —
+which is why `conversationUntitled` had to exist at all.
+
+*On the same rule for the explicit buttons.* #32 drew a line here — "a button
+pressed deliberately is not the same as a tab crossed on the way somewhere else" —
+and the line does not hold, because what lands in the history is identical either
+way. A person who presses "new conversation" and then puts the phone down has not
+had a conversation, and a row saying they did is the same defect in a politer
+costume. One rule is also one thing to explain.
+
+*On deleting the open conversation landing here.* Before this it landed nowhere:
+the router stayed on the deleted id, the notifier was never invalidated, and the
+screen went blank while remaining fully usable — and because the tombstone still
+satisfies the messages' foreign key, `send` went on writing into a conversation
+that appeared in no list. `/chat` is the honest destination, and it exists now.
+Going there is also what disposes the notifier and its `LlmSession`. The last
+conversation is not a special case: there is no survivor to fall back to, and
+after this change there does not need to be one.
+
+*On `extra` rather than a provider.* `ChatScreen` wraps its subtree in a nested
+`ProviderScope` overriding `safetyLocaleProvider`, and `/chat` and `/chat/:id` are
+two different route builders — so a provider carrying the message across would
+raise a question about which container hosts it, on a code path that must not
+silently drop what someone typed. Constructor data has no such question, and a
+widget test can pump `ChatScreen(conversationId: id, initialMessage: …)` with no
+router at all.
+
+**Rejected alternatives.**
+
+- *Keep creating on entry and simply filter message-less conversations out of the
+  list* — the smallest possible change, and it produces the behaviour the user
+  asked for. Rejected: the rows still exist, still carry an `updatedAt`, and
+  every other reader would need the same filter bolted on — `latestConversation`,
+  Home's resume card, and whatever reads the table next. A list that lies about
+  the table under it is a bug waiting for its second reader.
+- *Keep the explicit "new conversation" buttons creating a row* — #32's
+  distinction, preserved. Rejected on the reading above: two rules, and the
+  untitled row is precisely the complaint.
+- *Create the conversation and append the first message from the draft, then let
+  the notifier notice an unanswered user message and generate* — no `extra`, no
+  dispatch. Rejected: "the last message is the user's, so generate" is also true
+  of a turn that was cancelled or that failed, so reopening either would silently
+  re-run it.
+- *Reuse a blank conversation, as #32 did* — it is what this replaces. Rejected
+  with the row it was working around.
+
+**Consequence — the prefill moved, deliberately.** With no conversation there is
+no session, so the one prefill §5.1 describes can no longer start when the tab is
+entered; it starts when the first message is sent. On #19's measurement that is
+about six seconds added to the *first* reply of a conversation and to no other.
+Accepted, and mitigated where it counts: the draft screen watches
+`llmServiceProvider`, so the model's load — the larger of the two waits, and the
+one that is paid once per launch rather than once per conversation — still begins
+the moment the chat is opened. The engine check now sits *ahead* of the
+nothing-chosen branch for that reason, where #32 deliberately put it after.
+
+Pre-warming a session against the seed a fresh conversation would produce, and
+having `ChatNotifier` adopt it, would remove even that — and was left out on
+purpose: it hands one `LlmSession` between two providers, each of which disposes
+what it owns, and a double-dispose or a leaked KV cache is a worse bug than a
+slower first reply.
+
+**Consequence — two empty states can meet.** On a genuine first run at desktop
+width the conversation list's empty state and the draft's own show the same two
+sentences at once, on opposite sides of the screen. It resolves the moment one
+conversation exists, and separate copy for the draft was judged not worth a
+fourth string saying the same thing.
 
 ---
 

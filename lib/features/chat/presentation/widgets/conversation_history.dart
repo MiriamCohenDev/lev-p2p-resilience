@@ -10,7 +10,6 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/lev_widgets.dart';
 import '../../domain/conversation.dart';
-import '../start_conversation.dart';
 
 /// The saved conversations, wired to storage.
 ///
@@ -221,16 +220,39 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
 
     final repository = await ref.read(chatRepositoryProvider.future);
     await repository.deleteConversation(conversationId);
+    if (!mounted) return;
+
+    // Deleting the conversation you are looking at leaves you looking at
+    // nothing — so it leaves you where the chat starts instead, at the draft.
+    // Not merely tidier: without this the router stays on the deleted id, and
+    // the tombstoned row still satisfies the messages' foreign key, so the
+    // screen would go on accepting messages into a conversation that appears in
+    // no list. Going to `/chat` is also what disposes the notifier and its
+    // session.
+    //
+    // The same whether or not it was the last one left: there is no other
+    // conversation to fall back to, and there does not need to be.
+    if (conversationId != widget.selectedId) return;
+    _leaveDrawer();
+    if (!mounted) return;
+    context.go(AppRoutes.chat);
   }
 
-  Future<void> _startConversation() async {
-    final id = await startConversation(ref);
-    if (!mounted) return;
-    // In the drawer, creating one closes it — the same rule picking one follows.
-    final navigator = Navigator.of(context);
-    if (Scaffold.maybeOf(context)?.hasDrawer ?? false) navigator.pop();
-    if (!mounted) return;
-    context.go(AppRoutes.conversation(id));
+  /// "New conversation": the empty draft, not a new row.
+  ///
+  /// It creates nothing — a conversation exists once something has been said in
+  /// it (technical-decisions #34) — so this is a navigation and nothing else.
+  void _startConversation() {
+    _leaveDrawer();
+    context.go(AppRoutes.chat);
+  }
+
+  /// In the drawer, going somewhere closes it — the same rule picking a
+  /// conversation follows.
+  void _leaveDrawer() {
+    if (Scaffold.maybeOf(context)?.hasDrawer ?? false) {
+      Navigator.of(context).pop();
+    }
   }
 }
 

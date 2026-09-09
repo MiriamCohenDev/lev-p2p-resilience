@@ -37,6 +37,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => ChatScreen(
               conversationId:
                   state.pathParameters[AppRoutes.conversationIdParam],
+              // The message the draft was carrying when it created this
+              // conversation, if that is how we arrived (technical-decisions
+              // #34). Null on every other route into a conversation.
+              initialMessage: state.extra as String?,
             ),
           ),
         ],
