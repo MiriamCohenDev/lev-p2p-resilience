@@ -20,6 +20,9 @@ class ModelDescriptor {
     required this.replyTokenReserve,
     required this.stopTokens,
     required this.quantization,
+    this.sizeBytes,
+    this.attribution,
+    this.licenseAsset,
   });
 
   factory ModelDescriptor.fromJson(Map<String, Object?> json) {
@@ -45,6 +48,14 @@ class ModelDescriptor {
       replyTokenReserve: require<int>('replyTokenReserve'),
       stopTokens: require<List<Object?>>('stopTokens').cast<String>(),
       quantization: require<String>('quantization'),
+      // Optional, and read leniently: it is shown to the user and never acted
+      // on, so a manifest without it should still load.
+      sizeBytes: json['sizeBytes'] is int ? json['sizeBytes']! as int : null,
+      attribution:
+          json['attribution'] is String ? json['attribution']! as String : null,
+      licenseAsset: json['licenseAsset'] is String
+          ? json['licenseAsset']! as String
+          : null,
     );
   }
 
@@ -80,6 +91,49 @@ class ModelDescriptor {
 
   /// e.g. `Q4_K_M`.
   final String quantization;
+
+  /// The GGUF's size on disk, for the Settings screen.
+  ///
+  /// Declared in the manifest rather than measured, and that is not laziness:
+  /// `ModelFileStore.pathFor` verifies the digest by streaming the whole file,
+  /// so asking it for a path merely to call `length()` would re-hash several
+  /// hundred megabytes every time Settings is opened. Nothing depends on this
+  /// value being right — it is displayed, never enforced — so a stale number
+  /// misinforms rather than breaks, and it sits beside the `sha256` that *is*
+  /// enforced.
+  ///
+  /// Nullable: a manifest entry without it simply shows no size.
+  final int? sizeBytes;
+
+  /// The one line the model's licence obliges the product to show, verbatim.
+  ///
+  /// e.g. `Qwen2.5-0.5B-Instruct · © Alibaba Cloud · Apache License 2.0`.
+  /// Shown in the About section beneath the active model.
+  ///
+  /// **Data, not a translated string.** It is in the manifest and not in an ARB
+  /// file for two reasons: a second model arrives with a different licence and
+  /// that must not be a code change (§5.3), and a licence notice is not
+  /// interface copy — translating an attribution is how it stops being the
+  /// notice the licence asked for.
+  ///
+  /// Nullable, and read leniently, so a manifest written before this field
+  /// still loads. A model with no attribution simply shows none.
+  final String? attribution;
+
+  /// The bundled licence text for these weights, e.g.
+  /// `assets/licenses/qwen-en-q4-license.txt`.
+  ///
+  /// Registered with `LicenseRegistry` at startup so it reaches the licence
+  /// page. That page collects **pub packages** on its own and knows nothing
+  /// about assets, so a bundled model would otherwise be the one dependency
+  /// with a real obligation that never appears there.
+  final String? licenseAsset;
+
+  /// The size in whole tenths of a gigabyte, as Settings writes it, or `null`
+  /// when [sizeBytes] is absent. Decimal GB, matching what an installer reports.
+  String? get sizeInGigabytes => sizeBytes == null
+      ? null
+      : (sizeBytes! / 1000000000).toStringAsFixed(1);
 
   /// What `PromptBuilder` must fit everything into (§5.2.3).
   int get promptBudgetTokens => contextTokens - replyTokenReserve;

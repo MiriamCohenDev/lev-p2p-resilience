@@ -39,6 +39,11 @@ class FakeKeyManager implements KeyManager {
   @override
   Future<void> sweepIncompleteRewrap() async {}
 
+  int destroyCalls = 0;
+
+  @override
+  Future<void> destroyKeyMaterial() async => destroyCalls++;
+
   @override
   void dispose() {}
 }

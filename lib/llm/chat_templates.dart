@@ -24,6 +24,22 @@ abstract class ChatTemplate {
   /// rather than inventing another user message.
   String get assistantCue;
 
+  /// The marker that takes the floor back once the assistant has finished.
+  ///
+  /// Phase 3 needs this and Phase 2 did not, because the fake engine never had a
+  /// transcript to keep. A real session does: llama.cpp reuses the KV cache by
+  /// matching the prefix of the prompt it is given (§5.1), so the session has to
+  /// append each reply to the running transcript before the next turn — and a
+  /// reply appended without its closing marker leaves the conversation
+  /// permanently mid-assistant-turn, after which the model answers as the user.
+  ///
+  /// It lives here, with the rest of the family's markers, rather than in the
+  /// engine: #16's whole point is that an engine which knows one model's
+  /// conventions has to know all of them, and a model swap then becomes an
+  /// engine rewrite. The engine receives this as a string on [Prompt] and never
+  /// learns what it means.
+  String get assistantSuffix;
+
   /// The template for [family], or a [ModelUnavailable] naming what is missing.
   ///
   /// Failing here rather than at manifest-load time is deliberate: an unknown
@@ -50,6 +66,9 @@ class ChatMlTemplate extends ChatTemplate {
 
   @override
   String get assistantCue => '<|im_start|>assistant\n';
+
+  @override
+  String get assistantSuffix => '<|im_end|>\n';
 }
 
 /// The Llama 3 instruct format.
@@ -67,4 +86,7 @@ class Llama3Template extends ChatTemplate {
   @override
   String get assistantCue =>
       '<|start_header_id|>assistant<|end_header_id|>\n\n';
+
+  @override
+  String get assistantSuffix => '<|eot_id|>';
 }

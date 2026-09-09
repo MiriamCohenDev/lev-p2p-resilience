@@ -57,3 +57,46 @@ Every shareable entity uses a **UUID** primary key (never auto-increment), carri
 
 ## Decisions log
 The rationale for every technical decision (and rejected alternatives) is recorded in `docs/technical-decisions.md`. When making a significant new technical decision, append it there with its reasoning.
+
+## Design — binding rules
+
+The full design system: `docs/design/README.md`. Screenshots of every screen:
+`docs/design/screens/`. **Before building a screen, look at that screen's image in
+that folder.** They are the source of truth, not this file and not the mockup PDFs.
+
+1. **No colour in a screen's code.** Every colour comes from
+   `Theme.of(context).extension<LevColors>()!` (or `levColors(context)`). A
+   `Color(0x…)` outside `lib/core/theme/app_theme.dart` is a bug.
+2. **No spacing numbers.** Only `LevSpace` (4·8·12·16·24·32·48·64) and `LevRadius`.
+3. **No improvised widget.** Button = `LevButton`. Card = `LevCard`. Bubble =
+   `LevBubble`. Empty or error state = `LevEmptyState`. Status pill =
+   `LevStatusPill`. Logo = `LevLogo`. A row's own menu = `showLevMenu`. A
+   missing component is added to
+   `lib/core/widgets/lev_widgets.dart`, never improvised in the screen.
+4. **The logo only through `LevLogo`.** Never `Text('LEV')`, never a hand-placed
+   `Icon`.
+   - `LevLogo.mark` in the bars and the side rail — **without the word LEV**.
+   - `LevLogo.vertical` on the first-run screen and the splash.
+   - `LevLogo.horizontal` outside the application — and, at `height: 20`, as the
+     signature at the head of the Settings "About" section (`LevBrandLine`).
+     That is the **only** place inside the app where the word appears.
+   - The `OutfitSemiBold` font is for the logo's wordmark **and nothing else**;
+     everything else is IBM Plex Sans Hebrew.
+5. **RTL:** `EdgeInsetsDirectional`, never `EdgeInsets` with `left`/`right`.
+   `AlignmentDirectional`, never `Alignment.centerLeft` / `centerRight`.
+6. **No `google_fonts`.** Fonts are bundled in `assets/fonts`. A network read is a bug.
+7. **No red** except the confirm button of "delete all data".
+8. **48dp minimum touch height** for anything tappable.
+9. **Every chat error screen ends** with the sentence saying mutual aid still works.
+10. **The safety layer's message** (`LevSupportCard`) appears *beside* the model's
+    reply, never in its place, and never as a modal dialog. Its only action is
+    `tel:`, never a link.
+
+### After any UI change
+
+```
+bash tool/check_design.sh
+flutter analyze
+```
+
+Both must pass. If `check_design.sh` fails — fix it, do not work around it.

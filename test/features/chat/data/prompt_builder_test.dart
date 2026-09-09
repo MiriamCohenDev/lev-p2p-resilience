@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lev/features/chat/data/default_prompt_builder.dart';
-import 'package:lev/features/chat/data/heuristic_tokenizer.dart';
+import 'package:lev/features/chat/data/calibrated_tokenizer.dart';
 import 'package:lev/features/chat/data/system_prompt.dart';
 import 'package:lev/features/chat/domain/conversation.dart';
 import 'package:lev/features/chat/domain/llm_errors.dart';
@@ -13,7 +13,7 @@ import 'package:lev/llm/model_descriptor.dart';
 /// this layer is the product's actual behaviour and is engine-independent, so it
 /// is finished and tested before any model exists.
 void main() {
-  const tokenizer = HeuristicTokenizer();
+  const tokenizer = CalibratedTokenizer.uncalibrated();
   const systemPrompt = SystemPrompt(
     version: '1.0.0',
     text: 'You are LEV. Be calm, honest and brief.',

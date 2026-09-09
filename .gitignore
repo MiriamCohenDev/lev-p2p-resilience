@@ -52,3 +52,9 @@ app.*.map.json
 .agents/
 .claude/
 skills-lock.json
+
+# The GGUF weights (technical-decisions #19). Hundreds of megabytes of binary
+# that git cannot diff and every clone would pay for again. The manifest at
+# assets/models/models.json is the source of truth — it names the file and
+# pins its sha256, and `dart run tool/fetch_model.dart` fetches and verifies it.
+assets/models/*.gguf

@@ -30,6 +30,28 @@ dependencies:
   cryptography_plus: ^3.0.0
   flutter_secure_storage: ^11.0.0
 
+  # Local llama.cpp inference (technical-spec Section 5.2, technical-decisions
+  # #19). Native binaries arrive through Dart build hooks, exactly as SQLCipher
+  # does below — no C++ toolchain, no per-platform plugin wiring.
+  llamadart: ^0.8.20
+  # Streaming SHA-256 for the model integrity check (technical-spec Section 7.5).
+  # Direct, not transitive: `cryptography_plus` (used for key wrapping) buffers
+  # the whole input before hashing, which would cost as much RAM as the model.
+  crypto: ^3.0.7
+  # Reading device RAM through FFI, for the min-spec gate (Section 8).
+  ffi: ^2.2.0
+
+  # Opens the dialler for the support card's `tel:` action (technical-decisions
+  # #25). The only thing it is used for: a link to a website would be a dead
+  # button in an app with no network, so a phone call is the single action the
+  # safety layer offers.
+  url_launcher: ^6.3.2
+
+  # Renders the LEV mark from its own SVG (technical-decisions #27), so the
+  # design's file stays the single source of truth for the logo instead of a
+  # path transcribed into Dart. Pure Dart, no network, no native code.
+  flutter_svg: ^2.2.1
+
   # Encrypted local database (technical-spec Section 5.5, technical-decisions #4).
   drift: ^2.34.3
   # Direct: the storage layer runs SQLCipher pragmas against it (see `hooks`).
@@ -62,6 +84,13 @@ hooks:
   user_defines:
     sqlite3:
       source: sqlcipher
+    # llama.cpp only. llamadart also ships a LiteRT-LM runtime and a WebGPU
+    # (Dawn) stack, which together add roughly 90 MB of native libraries per
+    # desktop build for code LEV never calls — technical-spec Section 3 names
+    # llama.cpp as the engine, and Section 8 makes install size a budget rather
+    # than an afterthought. See technical-decisions #19.
+    llamadart:
+      llamadart_native_runtimes: llama_cpp
 
 flutter:
   uses-material-design: true
@@ -75,3 +104,46 @@ flutter:
     # The versioned system prompt and the safety pattern lists (§5.2.1, §5.2.4).
     # Assets rather than string literals so both can be tuned without a rebuild.
     - assets/prompts/
+    # The support message, its phone number and its review date, per UI language
+    # (technical-decisions #24). An asset for the same reason the patterns are
+    # one: a number that has gone stale is worse than a message that never
+    # appeared, and it must be fixable without a rebuild.
+    - assets/support/
+    # The licences of everything LEV bundles that is **not** a pub package:
+    # the two fonts, SQLCipher, and the model's weights. `showLicensePage`
+    # collects pub packages automatically and knows nothing about assets, so
+    # without these files the three obligations that actually travel with the
+    # binary would be the three that go unstated. Registered in
+    # `lib/core/licenses/asset_licenses.dart` and loaded lazily, only when the
+    # licence page is opened.
+    - assets/licenses/
+    # The LEV mark, in the two geometries the logo pack ships: a regular one and
+    # a heavier `micro` for small sizes. Copied verbatim from the design's
+    # `lev-logo/svg/`, and the only source of truth for the logo in the app
+    # (technical-decisions #27).
+    - assets/branding/
+
+  # Bundled, never downloaded: `google_fonts` fetches from the network on first
+  # run, which §8 makes a defect rather than a trade-off (technical-decisions
+  # #26). IBM Plex Sans Hebrew is OFL-licensed, so shipping it is permitted —
+  # assets/fonts/OFL.txt is the licence as published.
+  fonts:
+    - family: IBMPlexSansHebrew
+      fonts:
+        - asset: assets/fonts/IBMPlexSansHebrew-Light.ttf
+          weight: 300
+        - asset: assets/fonts/IBMPlexSansHebrew-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansHebrew-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansHebrew-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansHebrew-Bold.ttf
+          weight: 700
+    # The logo's wordmark, and **nothing else** (technical-decisions #28).
+    # Subset to A–Z at one weight, which is why it is 3.3 KB: it renders exactly
+    # three letters. The interface is IBM Plex Sans Hebrew throughout.
+    - family: OutfitSemiBold
+      fonts:
+        - asset: assets/fonts/Outfit-SemiBold-Subset.ttf
+          weight: 600

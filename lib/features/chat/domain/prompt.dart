@@ -11,6 +11,7 @@ class Prompt {
     required this.text,
     required this.stopTokens,
     required this.estimatedTokens,
+    this.assistantSuffix = '',
   });
 
   /// Already templated for the active model.
@@ -19,11 +20,27 @@ class Prompt {
   /// Where generation must stop, from `ModelDescriptor.stopTokens`.
   final List<String> stopTokens;
 
+  /// What closes the assistant's turn once generation has finished.
+  ///
+  /// An opaque string as far as the engine is concerned. A real session keeps a
+  /// running transcript so llama.cpp can match its prefix against the KV cache
+  /// (§5.1), and the reply has to be closed off in that transcript before the
+  /// next turn is appended — otherwise the conversation stays mid-turn and the
+  /// model starts answering as the user. The value comes from the active
+  /// family's `ChatTemplate`, so the engine still knows nothing about templates
+  /// (#16).
+  ///
+  /// Defaults to empty because `FakeLlmService` has no transcript to close, and
+  /// Phase 2's tests construct prompts directly.
+  final String assistantSuffix;
+
   /// What the active `Tokenizer` made of [text].
   ///
-  /// "Estimated" is honest about Phase 2, where the tokenizer is a heuristic.
-  /// Phase 3.1 swaps in the engine's real tokenizer and the number becomes
-  /// exact, with no change to this class or its callers.
+  /// "Estimated" stays honest in Phase 3. The count is now measured against the
+  /// loaded model's own vocabulary rather than a fixed constant, but it is still
+  /// an estimate rather than llama.cpp's exact count — technical-decisions #20
+  /// explains why the exact one is not affordable per message, and why the error
+  /// is kept pointing at over-counting.
   final int estimatedTokens;
 
   @override

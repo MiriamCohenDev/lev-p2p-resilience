@@ -132,6 +132,44 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
     await _repository.append(userMessage);
     await _titleFrom(trimmed);
 
+    await _runTurn(session, userMessage);
+  }
+
+  /// Asks again for the reply to the last thing the user said.
+  ///
+  /// What the "try again" on a cut-off reply does. The user's message is **not**
+  /// appended a second time — it is already stored and already on screen, and a
+  /// duplicate would rewrite the conversation to say something the user never
+  /// said twice. Only the generation is repeated.
+  ///
+  /// The safety layer is not re-run either: it evaluated this message when it
+  /// was sent, and its notice, if there was one, is still on screen. Running it
+  /// again would either show the card twice or, worse, look like it had changed
+  /// its mind.
+  Future<void> retryLastTurn() async {
+    final current = state.value;
+    final session = _session;
+    if (current == null || session == null || current.isBusy) return;
+
+    Message? lastUserMessage;
+    for (final message in current.messages.reversed) {
+      if (message.isFromUser) {
+        lastUserMessage = message;
+        break;
+      }
+    }
+    if (lastUserMessage == null) return;
+
+    state = AsyncData(
+      current.copyWith(isTyping: true, streamingText: '', clearFailure: true),
+    );
+
+    await _runTurn(session, lastUserMessage);
+  }
+
+  /// Streams one reply for [userMessage]. The half [send] and [retryLastTurn]
+  /// share, so a retry cannot drift out of step with a first attempt.
+  Future<void> _runTurn(LlmSession session, Message userMessage) async {
     final turn = _promptBuilder.buildTurn(userMessage, _model);
     final buffer = StringBuffer();
     final completed = Completer<void>();
@@ -251,7 +289,8 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
 
   /// Names the conversation after its opening message, once.
   ///
-  /// See `ChatRepository.updateTitle`: derived, not a rename action.
+  /// See `ChatRepository.updateTitle`. The guard below is what keeps this out
+  /// of the way of a title a person chose from the row's menu.
   Future<void> _titleFrom(String firstMessage) async {
     final conversation = await _repository.findConversation(conversationId);
     if (conversation == null || conversation.title.isNotEmpty) return;

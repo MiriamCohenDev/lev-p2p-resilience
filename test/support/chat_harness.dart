@@ -10,7 +10,11 @@ import 'package:lev/core/db/app_database.dart';
 import 'package:lev/core/di/chat_providers.dart';
 import 'package:lev/core/di/llm_providers.dart';
 import 'package:lev/core/di/prompt_providers.dart';
+import 'package:lev/core/di/settings_providers.dart';
 import 'package:lev/core/l10n/app_localizations.dart';
+import 'package:lev/core/support/support_resources.dart';
+import 'package:lev/core/theme/app_theme.dart';
+import 'package:lev/features/settings/data/drift_settings_repository.dart';
 import 'package:lev/features/chat/data/asset_safety_checker.dart';
 import 'package:lev/features/chat/data/drift_chat_repository.dart';
 import 'package:lev/features/chat/data/system_prompt.dart';
@@ -72,6 +76,10 @@ class ChatHarness {
         replyTokenReserve: contextTokens ~/ 8,
         stopTokens: const ['<|im_end|>'],
         quantization: 'Q4_K_M',
+        // Present so the About section has one to show. Real manifests carry
+        // whatever the model's own licence obliges; this is a stand-in with the
+        // same shape.
+        attribution: 'Test Model · © Nobody · Apache License 2.0',
       );
 
   /// The default descriptor, for tests that only need its id.
@@ -97,6 +105,23 @@ class ChatHarness {
 }
 ''';
 
+  /// A stand-in for `assets/support/<locale>.json`.
+  ///
+  /// Substituted for the same reason the prompt assets are: `rootBundle` caches
+  /// the future it returns, and a cached asset future does not resolve again
+  /// inside a later test's `fake_async` zone. The real files are parsed and
+  /// checked in `test/core/support/support_resources_test.dart`.
+  static const String supportResource = '''
+{
+  "title": "You are not alone with this",
+  "body": "If it is hard right now, you can talk to a person.",
+  "callLabel": "Call",
+  "phone": "1201",
+  "serviceName": "Test line",
+  "reviewedOn": "2026-08-30"
+}
+''';
+
   /// Replaces every binding the chat resolves, so nothing reaches a platform
   /// channel or a real file.
   ///
@@ -108,6 +133,12 @@ class ChatHarness {
   /// once, which is where asset loading belongs.
   List<Override> get overrides => [
         chatRepositoryProvider.overrideWith((ref) async => repository),
+        // The real Drift implementation over the same in-memory database, not a
+        // fake: the settings screen and the first-run gate are worth exercising
+        // against the table they actually write to.
+        settingsRepositoryProvider.overrideWith(
+          (ref) async => DriftSettingsRepository(database.preferencesDao),
+        ),
         llmServiceProvider.overrideWith((ref) async {
           await engine.loadModel(model);
           return engine as LlmService;
@@ -116,6 +147,9 @@ class ChatHarness {
         systemPromptProvider.overrideWith((ref) async => systemPrompt),
         safetyCheckerProvider.overrideWith(
           (ref) async => AssetSafetyChecker.parse(safetyPatterns),
+        ),
+        supportResourceProvider.overrideWith(
+          (ref) async => LevSupportResources.parse(supportResource),
         ),
       ];
 
@@ -137,7 +171,16 @@ class ChatHarness {
   Future<void> pumpApp(
     WidgetTester tester, {
     Locale locale = const Locale('en'),
+    bool onboardingSeen = true,
   }) async {
+    // The first-run gate sits above the router, so without this every
+    // navigation test would find the welcome screen instead of Home. Written
+    // through the real repository so the gate is reading a real row.
+    if (onboardingSeen) {
+      await DriftSettingsRepository(database.preferencesDao)
+          .markOnboardingSeen(DateTime.now());
+    }
+
     await tester.pumpWidget(
       ProviderScope(overrides: overrides, child: const LevApp()),
     );
@@ -173,6 +216,11 @@ class ChatHarness {
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        // The real theme, not the default one: every LEV widget reads its
+        // colours from the `LevColors` extension, and without it they throw
+        // rather than merely looking wrong.
+        theme: LevTheme.light,
+        darkTheme: LevTheme.dark,
         home: child,
       ),
     );

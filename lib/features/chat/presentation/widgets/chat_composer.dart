@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// The message field and its send / stop button.
 ///
@@ -53,15 +54,30 @@ class _ChatComposerState extends State<ChatComposer> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final c = levColors(context);
 
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: c.surface,
+          border: Border(top: BorderSide(color: c.line)),
+        ),
+        padding: const EdgeInsetsDirectional.all(LevSpace.md),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            _SendButton(
+              // While generating, the same slot offers a way out. §8 calls a
+              // frozen screen a defect; a send button that does nothing is the
+              // same defect with a nicer coat of paint.
+              icon: widget.isBusy ? Icons.stop_rounded : Icons.send_rounded,
+              tooltip: widget.isBusy ? l10n.chatStop : l10n.chatSend,
+              onPressed: widget.isBusy
+                  ? widget.onStop
+                  : (widget.enabled ? _submit : null),
+            ),
+            const SizedBox(width: LevSpace.sm),
             Expanded(
               child: TextField(
                 controller: _controller,
@@ -71,35 +87,55 @@ class _ChatComposerState extends State<ChatComposer> {
                 maxLines: 5,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  hintText: l10n.chatInputHint,
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
+                decoration: InputDecoration(hintText: l10n.chatInputHint),
               ),
             ),
-            const SizedBox(width: 8),
-            // While generating, the same slot offers a way out. §8 calls a
-            // frozen screen a defect; a send button that does nothing is the
-            // same defect with a nicer coat of paint.
-            widget.isBusy
-                ? IconButton.filled(
-                    onPressed: widget.onStop,
-                    icon: const Icon(Icons.stop_rounded),
-                    tooltip: l10n.chatStop,
-                  )
-                : IconButton.filled(
-                    onPressed: widget.enabled ? _submit : null,
-                    icon: const Icon(Icons.send_rounded),
-                    tooltip: l10n.chatSend,
-                  ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The one filled control in the composer: a turquoise square, on the end side.
+class _SendButton extends StatelessWidget {
+  const _SendButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = levColors(context);
+    final enabled = onPressed != null;
+
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: tooltip,
+        child: Material(
+          color: enabled ? c.primary : c.line,
+          borderRadius: LevRadius.buttonAll,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: LevRadius.buttonAll,
+            child: SizedBox(
+              width: LevSpace.minTouch,
+              height: LevSpace.minTouch,
+              child: Icon(
+                icon,
+                size: 20,
+                color: enabled ? c.onPrimary : c.disabled,
+              ),
+            ),
+          ),
         ),
       ),
     );

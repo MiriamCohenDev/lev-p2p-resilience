@@ -5,7 +5,7 @@ import '../domain/llm_errors.dart';
 import '../domain/llm_service.dart';
 import '../domain/prompt.dart';
 import '../domain/tokenizer.dart';
-import 'heuristic_tokenizer.dart';
+import 'calibrated_tokenizer.dart';
 
 /// How the fake engine should misbehave.
 ///
@@ -43,7 +43,7 @@ enum FakeEngineMode {
 /// only this class can provide, the interface is wrong.
 class FakeLlmService implements LlmService {
   FakeLlmService({
-    this.tokenizer = const HeuristicTokenizer(),
+    this.tokenizer = const CalibratedTokenizer.uncalibrated(),
     this.tokenDelay = const Duration(milliseconds: 20),
     this.prefillDelay = Duration.zero,
     this.mode = FakeEngineMode.normal,

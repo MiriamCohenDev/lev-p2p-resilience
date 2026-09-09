@@ -1,12 +1,19 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
-import '../../features/chat/data/fake_llm_service.dart';
-import '../../features/chat/data/heuristic_tokenizer.dart';
+import '../../features/chat/data/calibrated_tokenizer.dart';
+import '../../features/chat/data/llama_cpp_llm_service.dart';
 import '../../features/chat/domain/llm_service.dart';
 import '../../features/chat/domain/tokenizer.dart';
 import '../../llm/model_descriptor.dart';
+import '../../llm/model_file_store.dart';
 import '../../llm/model_registry.dart';
+import '../platform/device_memory.dart';
+import 'prompt_providers.dart';
 
 /// Inference wiring. Hand-written providers, per technical-decisions #10.
 ///
@@ -29,13 +36,23 @@ final modelRegistryProvider = FutureProvider<ModelRegistry>((ref) async {
 
 /// How much RAM the selector may assume.
 ///
-/// **A placeholder with a real seam.** §9's Phase 3.2 is where min-spec gating
-/// is implemented against the actual device, because that is the first phase
-/// where a model is loaded and the number means something. Until then this
-/// reports a value that admits every descriptor, so Phase 2 is never blocked by
-/// a gate it cannot yet measure. Overriding this provider is how Phase 3.2 will
-/// replace it, and how a test explores the gate today.
-final deviceRamMbProvider = Provider<int>((ref) => 1 << 20);
+/// **Phase 3.2's replacement of the Phase 2 placeholder.** Phase 2 reported a
+/// value that admitted every descriptor, because nothing was loaded and the
+/// number could not mean anything. It means something now: §8 makes the
+/// min-spec gate the difference between a model that runs and one that fails to
+/// load or takes the app down with it.
+///
+/// When the platform cannot be measured, the gate is opened rather than closed.
+/// Being unable to *read* the RAM figure is not evidence that there is too
+/// little of it, and refusing to start a chat on that basis would turn a missing
+/// `/proc` into a broken app. The failure that follows — a model that will not
+/// load — is at least reported against the real cause.
+final deviceRamMbProvider = Provider<int>((ref) {
+  return totalPhysicalMemoryMb() ?? _unmeasuredRamMb;
+});
+
+/// Stands in when the device's RAM cannot be read. Admits every descriptor.
+const int _unmeasuredRamMb = 1 << 20;
 
 /// The language to prefer when selecting a model.
 ///
@@ -60,22 +77,60 @@ final activeModelProvider = FutureProvider<ModelDescriptor>((ref) async {
   );
 });
 
-/// The token counter used for budget enforcement.
+/// Where the GGUF weights live once installed.
 ///
-/// Phase 2 counts heuristically; Phase 3.1 replaces this binding with the
-/// engine's own tokenizer (Appendix A). Exposed separately from
-/// [llmServiceProvider] so `PromptBuilder` can be constructed and tested without
-/// an engine at all.
-final tokenizerProvider = Provider<Tokenizer>((ref) => const HeuristicTokenizer());
+/// The application support directory, not the documents directory: these are
+/// not the user's files, they are the app's, and on desktop the documents
+/// directory is somewhere a person keeps their own things.
+final modelFileStoreProvider = FutureProvider<ModelFileStore>((ref) async {
+  final support = await getApplicationSupportDirectory();
+  return InstalledModelFileStore(
+    directory: Directory(p.join(support.path, 'models')),
+  );
+});
 
 /// The inference engine.
 ///
-/// **This is the Phase 3.1 swap point.** Replacing `FakeLlmService` with
-/// `LlamaCppLlmService` here is the whole of the change §9 promises leaves chat
-/// code untouched. Nothing above this provider may name the concrete type.
+/// **This is the Phase 3.1 swap, made.** `FakeLlmService` was registered here
+/// through the whole of Phase 2 and the chat was built and finished against it;
+/// replacing it with [LlamaCppLlmService] is the change §9 promises leaves chat
+/// code untouched. Nothing above this provider names the concrete type, and
+/// `features/chat/presentation` was not edited at all. The domain changed only
+/// additively — see the class comment on [LlamaCppLlmService] for the exact
+/// accounting, which is kept honest rather than round.
+///
+/// The fake has not been deleted. It is still what the widget tests drive the
+/// UI's loading and failure states with (#16: it is a product decision, not a
+/// test double), and it is still the only way to exercise the chat on a machine
+/// with no weights installed.
 final llmServiceProvider = FutureProvider<LlmService>((ref) async {
-  final service = FakeLlmService(tokenizer: ref.watch(tokenizerProvider));
-  ref.onDispose(service.unload);
+  final service = LlamaCppLlmService(
+    fileStore: await ref.watch(modelFileStoreProvider.future),
+    // The system prompt is the one long piece of text we know the model will
+    // actually be shown, so it is the honest thing to measure the vocabulary's
+    // tokens-per-character against. See `CalibratedTokenizer`.
+    calibrationSamples: [
+      (await ref.watch(systemPromptProvider.future)).text,
+    ],
+  );
+  ref.onDispose(service.dispose);
   await service.loadModel(await ref.watch(activeModelProvider.future));
   return service;
+});
+
+/// The token counter used for budget enforcement.
+///
+/// Now the loaded model's own, calibrated against its vocabulary at load time —
+/// Phase 2 counted with a fixed heuristic constant. It is read off the engine
+/// rather than constructed here, because only the engine knows which model is
+/// loaded and therefore which vocabulary the count refers to.
+///
+/// Kept as a separate provider so `PromptBuilder` can still be constructed and
+/// tested without an engine at all; a test overrides this one and never touches
+/// llama.cpp.
+final tokenizerProvider = Provider<Tokenizer>((ref) {
+  return ref.watch(llmServiceProvider).maybeWhen(
+        data: (service) => service.tokenizer,
+        orElse: () => const CalibratedTokenizer.uncalibrated(),
+      );
 });

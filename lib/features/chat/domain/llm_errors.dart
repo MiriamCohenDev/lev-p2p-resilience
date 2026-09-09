@@ -28,6 +28,18 @@ class NoSuitableModel extends LlmException {
   const NoSuitableModel(super.message, {super.cause});
 }
 
+/// The weights on disk are not the weights the manifest pins (§7.5).
+///
+/// Distinct from [ModelUnavailable] because the two mean opposite things about
+/// the file: "there is nothing here" is an installation that has not finished,
+/// while "this is not what it claims to be" is a corrupt download or a tampered
+/// file. Only the second is a reason to refuse a file that is sitting right
+/// there, and only the second should ever be surfaced as a warning rather than
+/// as a setup step.
+class ModelIntegrityFailed extends LlmException {
+  const ModelIntegrityFailed(super.message, {super.cause});
+}
+
 /// The manifest under `assets/models/` could not be read or parsed.
 class ModelManifestInvalid extends LlmException {
   const ModelManifestInvalid(super.message, {super.cause});
