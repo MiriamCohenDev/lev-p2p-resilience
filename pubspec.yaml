@@ -109,6 +109,14 @@ flutter:
     # one: a number that has gone stale is worse than a message that never
     # appeared, and it must be fixable without a rebuild.
     - assets/support/
+    # The licences of everything LEV bundles that is **not** a pub package:
+    # the two fonts, SQLCipher, and the model's weights. `showLicensePage`
+    # collects pub packages automatically and knows nothing about assets, so
+    # without these files the three obligations that actually travel with the
+    # binary would be the three that go unstated. Registered in
+    # `lib/core/licenses/asset_licenses.dart` and loaded lazily, only when the
+    # licence page is opened.
+    - assets/licenses/
     # The LEV mark, in the two geometries the logo pack ships: a regular one and
     # a heavier `micro` for small sizes. Copied verbatim from the design's
     # `lev-logo/svg/`, and the only source of truth for the logo in the app

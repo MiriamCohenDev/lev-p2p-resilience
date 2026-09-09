@@ -1618,6 +1618,162 @@ the moment it clears.
 
 ---
 
+## #33 — Asset licences are registered by hand, and About is a section rather than a screen
+
+**Status:** Accepted
+
+**Decision.** Four parts.
+
+1. **`assets/licenses/` is declared as a Flutter asset** and holds the licence
+   text of everything LEV bundles that is *not* a pub package: both fonts,
+   SQLCipher, and the model's weights.
+2. **`LevAssetLicenses.register()` is called once in `main()`, before
+   `runApp`.** It hands `LicenseRegistry` a stream function; nothing is read
+   until the licence page is opened.
+3. **The model's licence and attribution live in the models manifest**, as
+   `licenseAsset` and `attribution` on each entry. `attribution` is shown
+   verbatim in About and is **not** routed through the ARB files.
+4. **About is the last section of the settings screen.** No route, no
+   destination in the bar, no card on Home. `package_info_plus` was **not**
+   added; `AppInfo` gained `buildNumber` and `buildStamp` instead.
+
+**Rationale.**
+
+*On registering the assets at all.* `showLicensePage` collects pub packages by
+itself, from the `NOTICES` file the tool chain generates, and it knows nothing
+about assets. The obligations that actually travel with a LEV build are all
+assets — and #2 removes the usual escape hatch, because an application
+distributed by file transfer has no store listing to carry the notices instead.
+The page inside the product is the only place they can appear, and until now it
+listed forty packages nobody has an obligation about and omitted the four that
+carry one. **`Outfit` had no licence file in the repository at all** (#28 ships
+a subset of it and #26 committed only IBM Plex's OFL), so this closed a real
+gap rather than tidying a formality.
+
+*On the manifest owning the model's licence.* Every other per-model fact is
+data because §5.3 makes adding a model a manifest entry rather than a code
+change, and a licence is the last thing that should be the exception — a second
+model arrives under different terms. Keeping `attribution` out of the ARB files
+is the same argument from the other side: it is a notice a licence asked for,
+not interface copy, and translating an attribution is how it stops being the
+notice that was required.
+
+*On lazy loading.* `addLicense` takes a `Stream<LicenseEntry> Function()`, so
+`main()` pays for a closure and nothing else. Reading four files eagerly at
+startup to serve a page most people never open would be the wrong trade in an
+application whose cold start already carries an encrypted-database unlock.
+
+*On About being a section.* #22 fixed three permanent destinations, and a fourth
+tab for a page nobody opens twice is a tab taken from something else. Settings
+already had an "About" group with a version row in it; this is that group
+finished, not a new place.
+
+*On the four sentences.* The promise "everything on the device, no account, no
+network" was made in passing — once on the first-run screen, and as half a line
+under the model row — and nowhere a person could go back to. There is
+deliberately **no privacy policy behind a link**: this is an application with no
+network, where a link is a dead button (#25), so the policy has to *be* the four
+sentences rather than point at them.
+
+*On the build number.* LEV is handed between devices as a file, with no store,
+no update check and no crash reporting, so a bug report arrives as a sentence
+somebody typed. Two people can hold the same version at different builds. A long
+press copies the exact pair.
+
+**Rejected alternatives.**
+
+- *`package_info_plus`, which the task explicitly permitted* — it reads the
+  version out of the installed package, which is the most truthful source there
+  is. Rejected because `AppInfo` already solves this with a constant that
+  `test/core/app_info_test.dart` pins to `pubspec.yaml`, so the drift the plugin
+  protects against is already a failing test — and the plugin is a platform
+  channel on four targets for one row of text. Reversible in an afternoon if a
+  build ever ships whose reported version is wrong.
+- *A separate About screen with its own route* — more room, and the obvious
+  shape. Rejected on #22: it is either a fourth destination or a pushed screen
+  reachable only from Settings, and the second is what a section already is.
+- *Letting `showLicensePage` stand on its own* — no assets, no registration, no
+  new files. Rejected outright: it is precisely the four bundled licences that
+  oblige us, and they are the four it cannot see.
+- *A single shared OFL file for both fonts* — the licence body is identical.
+  Rejected: the copyright line is not, and OFL §1 requires the notice to travel
+  with the font it covers. `test/core/licenses/asset_licenses_test.dart` asserts
+  each entry names its own holder.
+- *Translating `attribution` through the ARB files* — consistent with #11.
+  Rejected on the reasoning above.
+- *Reading the model row from a second provider* — none was needed;
+  `activeModelProvider` already feeds the model group higher up the screen, and
+  both rows now format it through one shared `model_labels.dart`. They showed
+  the same model two different ways for one commit, which is exactly the defect
+  a second source of truth produces.
+
+**Consequence — #28's "horizontal, outside the application only" is amended.**
+
+The About signature is `LevLogo.horizontal(height: 20)`, centred, and it is the
+**only** place inside the application where the wordmark appears. The first
+build assembled it by hand — the mark beside a `Text` carrying the brand string
+from an ARB entry — which is precisely the lockup #28 removed from the bars, and
+worse in one respect: it sets the wordmark in the interface face, so the
+product's name becomes a heading that happens to say it. The static guard did
+not catch it, because it looks for the literal `Text('LEV')` in source and the
+string arrived from a localisation. `LevLogo.vertical` was the other candidate
+and is wrong for the opposite reason: the stacked lockup is how the product
+introduces itself, and this is a signature at the foot of a settings screen.
+`CLAUDE.md` rule 4 and `lev_logo.dart`'s own table are updated to say so.
+
+**Consequence — and one repair to a shared component.**
+
+`LevListRow` laid its `value` out with an unbounded main axis, so a value that
+did not fit **overflowed** rather than wrapping. This was pre-existing — the
+*language* and *lock* rows are what tripped it — and it surfaced only because
+the new layout test pumps at 430px, where `flutter_test`'s much wider stand-in
+font makes the case real. It is the same defect the design checklist's
+200%-text-scale item would have found by hand.
+
+Title and value now share an inner `Row`, both `Flexible`, under
+`MainAxisAlignment.spaceBetween`: each is capped at half the row, and the slack
+goes to the gap *between* them, so a short value still sits hard against the
+chevron instead of leaving a hole beside it.
+
+**The first fix for this was a `LayoutBuilder` measuring the row and capping the
+value against it, and it broke the settings screen.** `AlertDialog` wraps its
+content in `IntrinsicWidth`, which asks its children for intrinsic dimensions —
+a question `LayoutBuilder` cannot answer — so every row in the language and
+appearance pickers threw on layout. The dialog opened, drew nothing usable, and
+the screen read as frozen. It reached a running build because **the pickers had
+no test at all**: `test/features/settings/settings_pickers_test.dart` covers
+them now, and pins the underlying property directly, since a row that cannot
+report an intrinsic width breaks anywhere Flutter asks for one — an
+`IntrinsicHeight` or a `DataTable` next time, not only a dialog.
+
+The lesson worth keeping is about where the guard belongs. A component used in
+two contexts needs a test in the second one; the About section had thorough
+coverage and the screen it was added to had none, so the change was verified
+exactly where it was safe.
+
+**Verified.** `flutter test integration_test/about_licenses_test.dart -d windows`
+builds and runs the real Windows application and confirms the licence page lists
+IBM Plex Sans Hebrew, Outfit, SQLCipher and the Qwen attribution — the check a
+host test cannot make, because it is `assets/licenses/` being *packaged* that is
+at stake. `build/windows/.../flutter_assets/assets/licenses/` holds all four
+files and `NOTICES.Z` sits beside them.
+
+Two findings worth keeping:
+
+- **Draining `LicenseRegistry` under a test binding returns only our entries.**
+  Flutter's own collector decompresses `NOTICES.Z` on a background isolate,
+  which never completes under fake async. This is a harness artifact, not a
+  product one — the integration test asserts the packaged `NOTICES.Z` is
+  non-empty instead of asserting on package names.
+- **OpenSSL is still unaccounted for.** #13 records that the SQLCipher build
+  links it on Windows, Linux and Android. `assets/licenses/sqlcipher.txt` covers
+  SQLCipher and notes that SQLite's core is public domain, but says nothing
+  about OpenSSL, because which OpenSSL version the hook links has not been
+  established. **Open for Phase 5**, alongside the packaging and licensing note
+  #13 already flags.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

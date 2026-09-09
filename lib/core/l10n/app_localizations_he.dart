@@ -283,6 +283,44 @@ class AppLocalizationsHe extends AppLocalizations {
   String get settingsVersion => 'גרסה';
 
   @override
+  String aboutVersionValue(String version, String build) {
+    return '$version (build $build)';
+  }
+
+  @override
+  String get aboutVersionCopyHint =>
+      'לחיצה ארוכה מעתיקה את הגרסה ומספר ה-build';
+
+  @override
+  String get aboutCopied => 'הועתק';
+
+  @override
+  String get aboutHowItWorks => 'איך LEV עובד';
+
+  @override
+  String get aboutFactStorage =>
+      'השיחות והבקשות נשמרות במכשיר הזה בלבד, במסד נתונים מוצפן.';
+
+  @override
+  String get aboutFactNoAccount =>
+      'אין חשבון ואין הרשמה. אין שרת שאליו נשלח מידע.';
+
+  @override
+  String get aboutFactOnDevice =>
+      'מודל השפה רץ על המכשיר עצמו. מה שנכתב בצ\'אט לא יוצא ממנו.';
+
+  @override
+  String get aboutFactDeletion =>
+      'מחיקת האפליקציה מוחקת את הנתונים. אין עותק במקום אחר.';
+
+  @override
+  String get aboutLicenses => 'רישיונות קוד פתוח';
+
+  @override
+  String get aboutLegalese =>
+      'LEV מופצת ברישיון Apache 2.0. הפונטים, מסד הנתונים המוצפן ומודל השפה נושאים רישיונות משלהם, והם מופיעים כאן.';
+
+  @override
   String get deleteAllTitle => 'למחוק את כל הנתונים?';
 
   @override

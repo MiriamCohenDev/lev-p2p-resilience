@@ -608,6 +608,66 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get settingsVersion;
 
+  /// The value of the About version row. LEV is handed between devices as a file, so the build number is shown too: it is the only thing that distinguishes two binaries carrying the same version
+  ///
+  /// In en, this message translates to:
+  /// **'{version} (build {build})'**
+  String aboutVersionValue(String version, String build);
+
+  /// Announced by a screen reader after the version row's title. A long press is invisible, so a row that carries one has to say so
+  ///
+  /// In en, this message translates to:
+  /// **'Press and hold to copy the version and build number'**
+  String get aboutVersionCopyHint;
+
+  /// Snackbar shown after the version row copies itself to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get aboutCopied;
+
+  /// Sub-heading above the four statements about where data lives
+  ///
+  /// In en, this message translates to:
+  /// **'How LEV works'**
+  String get aboutHowItWorks;
+
+  /// About statement 1 of 4. Plain fact, not marketing — this section is where the product's central promise is written down
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations and requests are kept on this device alone, in an encrypted database.'**
+  String get aboutFactStorage;
+
+  /// About statement 2 of 4
+  ///
+  /// In en, this message translates to:
+  /// **'There is no account and no sign-up. There is no server for information to be sent to.'**
+  String get aboutFactNoAccount;
+
+  /// About statement 3 of 4
+  ///
+  /// In en, this message translates to:
+  /// **'The language model runs on the device itself. What is written in the chat does not leave it.'**
+  String get aboutFactOnDevice;
+
+  /// About statement 4 of 4. The other half of the promise: no server also means no recovery
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting the application deletes the data. There is no copy anywhere else.'**
+  String get aboutFactDeletion;
+
+  /// About row that opens the licence page
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source licences'**
+  String get aboutLicenses;
+
+  /// The legalese line at the head of the licence page. Says outright that the bundled assets are listed, because they are the ones a reader would not expect a licence page to know about
+  ///
+  /// In en, this message translates to:
+  /// **'LEV is distributed under the Apache 2.0 licence. The fonts, the encrypted database and the language model carry licences of their own, and they appear here.'**
+  String get aboutLegalese;
+
   /// Title of the only destructive confirmation in the product, and the only place its red appears
   ///
   /// In en, this message translates to:

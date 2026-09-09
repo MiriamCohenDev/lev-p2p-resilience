@@ -76,6 +76,10 @@ class ChatHarness {
         replyTokenReserve: contextTokens ~/ 8,
         stopTokens: const ['<|im_end|>'],
         quantization: 'Q4_K_M',
+        // Present so the About section has one to show. Real manifests carry
+        // whatever the model's own licence obliges; this is a stand-in with the
+        // same shape.
+        attribution: 'Test Model · © Nobody · Apache License 2.0',
       );
 
   /// The default descriptor, for tests that only need its id.

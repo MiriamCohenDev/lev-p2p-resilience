@@ -437,6 +437,60 @@
     "description": "Settings row showing the application version"
   },
 
+  "aboutVersionValue": "{version} (build {build})",
+  "@aboutVersionValue": {
+    "description": "The value of the About version row. LEV is handed between devices as a file, so the build number is shown too: it is the only thing that distinguishes two binaries carrying the same version",
+    "placeholders": {
+      "version": { "type": "String" },
+      "build": { "type": "String" }
+    }
+  },
+
+  "aboutVersionCopyHint": "Press and hold to copy the version and build number",
+  "@aboutVersionCopyHint": {
+    "description": "Announced by a screen reader after the version row's title. A long press is invisible, so a row that carries one has to say so"
+  },
+
+  "aboutCopied": "Copied",
+  "@aboutCopied": {
+    "description": "Snackbar shown after the version row copies itself to the clipboard"
+  },
+
+  "aboutHowItWorks": "How LEV works",
+  "@aboutHowItWorks": {
+    "description": "Sub-heading above the four statements about where data lives"
+  },
+
+  "aboutFactStorage": "Conversations and requests are kept on this device alone, in an encrypted database.",
+  "@aboutFactStorage": {
+    "description": "About statement 1 of 4. Plain fact, not marketing — this section is where the product's central promise is written down"
+  },
+
+  "aboutFactNoAccount": "There is no account and no sign-up. There is no server for information to be sent to.",
+  "@aboutFactNoAccount": {
+    "description": "About statement 2 of 4"
+  },
+
+  "aboutFactOnDevice": "The language model runs on the device itself. What is written in the chat does not leave it.",
+  "@aboutFactOnDevice": {
+    "description": "About statement 3 of 4"
+  },
+
+  "aboutFactDeletion": "Deleting the application deletes the data. There is no copy anywhere else.",
+  "@aboutFactDeletion": {
+    "description": "About statement 4 of 4. The other half of the promise: no server also means no recovery"
+  },
+
+  "aboutLicenses": "Open-source licences",
+  "@aboutLicenses": {
+    "description": "About row that opens the licence page"
+  },
+
+  "aboutLegalese": "LEV is distributed under the Apache 2.0 licence. The fonts, the encrypted database and the language model carry licences of their own, and they appear here.",
+  "@aboutLegalese": {
+    "description": "The legalese line at the head of the licence page. Says outright that the bundled assets are listed, because they are the ones a reader would not expect a licence page to know about"
+  },
+
   "deleteAllTitle": "Delete all data?",
   "@deleteAllTitle": {
     "description": "Title of the only destructive confirmation in the product, and the only place its red appears"

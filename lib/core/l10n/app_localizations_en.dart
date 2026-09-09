@@ -284,6 +284,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsVersion => 'Version';
 
   @override
+  String aboutVersionValue(String version, String build) {
+    return '$version (build $build)';
+  }
+
+  @override
+  String get aboutVersionCopyHint =>
+      'Press and hold to copy the version and build number';
+
+  @override
+  String get aboutCopied => 'Copied';
+
+  @override
+  String get aboutHowItWorks => 'How LEV works';
+
+  @override
+  String get aboutFactStorage =>
+      'Conversations and requests are kept on this device alone, in an encrypted database.';
+
+  @override
+  String get aboutFactNoAccount =>
+      'There is no account and no sign-up. There is no server for information to be sent to.';
+
+  @override
+  String get aboutFactOnDevice =>
+      'The language model runs on the device itself. What is written in the chat does not leave it.';
+
+  @override
+  String get aboutFactDeletion =>
+      'Deleting the application deletes the data. There is no copy anywhere else.';
+
+  @override
+  String get aboutLicenses => 'Open-source licences';
+
+  @override
+  String get aboutLegalese =>
+      'LEV is distributed under the Apache 2.0 licence. The fonts, the encrypted database and the language model carry licences of their own, and they appear here.';
+
+  @override
   String get deleteAllTitle => 'Delete all data?';
 
   @override

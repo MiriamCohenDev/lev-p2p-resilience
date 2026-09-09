@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../support/support_resources.dart';
 import '../theme/app_theme.dart';
-// Re-exported so a screen that imports the component library gets the logo with
-// it. There is one logo in this product and it comes from one place.
+// Imported for `LevBrandLine`, and re-exported so a screen that imports the
+// component library gets the logo with it. There is one logo in this product
+// and it comes from one place.
+import 'lev_logo.dart';
 export 'lev_logo.dart';
 
 /// LEV's component library.
@@ -109,11 +111,8 @@ class LevButton extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  height: 1,
-                  color: fg,
-                ),
+            style: Theme.of(context).textTheme.bodyLarge
+                ?.copyWith(fontWeight: FontWeight.w600, height: 1, color: fg),
           ),
         ),
       ],
@@ -194,7 +193,10 @@ Future<void> showLevMenu({
 
   final chosen = await showMenu<VoidCallback>(
     context: anchor,
-    position: RelativeRect.fromRect(origin & Size.zero, Offset.zero & overlay.size),
+    position: RelativeRect.fromRect(
+      origin & Size.zero,
+      Offset.zero & overlay.size,
+    ),
     color: c.surface,
     shape: RoundedRectangleBorder(
       borderRadius: LevRadius.cardAll,
@@ -261,9 +263,7 @@ class LevStatusPill extends StatelessWidget {
       decoration: BoxDecoration(color: bg, borderRadius: LevRadius.pill),
       child: Text(
         label,
-        style: Theme.of(context)
-            .textTheme
-            .labelLarge
+        style: Theme.of(context).textTheme.labelLarge
             ?.copyWith(color: fg, letterSpacing: 0),
       ),
     );
@@ -301,7 +301,9 @@ class LevCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: LevRadius.cardAll,
         // A card rests on a rule, not on a shadow.
-        side: BorderSide(color: background == null ? c.line : Colors.transparent),
+        side: BorderSide(
+          color: background == null ? c.line : Colors.transparent,
+        ),
       ),
       child: onTap == null
           ? content
@@ -405,9 +407,7 @@ class LevBubble extends StatelessWidget {
   }
 
   Widget _content(BuildContext context, LevColors c) {
-    final base = Theme.of(context)
-        .textTheme
-        .bodyLarge!
+    final base = Theme.of(context).textTheme.bodyLarge!
         .copyWith(color: fromUser ? c.onPrimary : c.ink);
 
     // **What the user wrote is never parsed.** Someone who types `**` means
@@ -851,7 +851,8 @@ class _LevRevealState extends State<_LevReveal>
       return;
     }
 
-    final dt = (elapsed - _last).inMicroseconds / Duration.microsecondsPerSecond;
+    final dt =
+        (elapsed - _last).inMicroseconds / Duration.microsecondsPerSecond;
     _last = elapsed;
     if (dt <= 0) return;
 
@@ -960,8 +961,9 @@ class _LevTypingIndicatorState extends State<LevTypingIndicator>
                   animation: _ctrl,
                   builder: (context, _) {
                     final t = ((_ctrl.value * 3) - i).clamp(0.0, 1.0);
-                    final opacity =
-                        still ? 0.6 : 0.28 + 0.62 * (1 - (2 * t - 1).abs());
+                    final opacity = still
+                        ? 0.6
+                        : 0.28 + 0.62 * (1 - (2 * t - 1).abs());
                     return Opacity(
                       opacity: opacity,
                       child: Container(
@@ -1029,10 +1031,8 @@ class LevBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 text,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: c.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: c.primary, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -1125,10 +1125,8 @@ class LevEmptyState extends StatelessWidget {
                 Text(
                   footnote!,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        letterSpacing: 0,
-                        fontWeight: FontWeight.w400,
-                      ),
+                  style: Theme.of(context).textTheme.labelLarge
+                      ?.copyWith(letterSpacing: 0, fontWeight: FontWeight.w400),
                 ),
               ],
             ],
@@ -1299,11 +1297,11 @@ class LevSegmented extends StatelessWidget {
                       labels[i],
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: i == selected ? c.primary : c.muted,
-                            fontWeight: i == selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
+                        color: i == selected ? c.primary : c.muted,
+                        fontWeight: i == selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
                     ),
                   ),
                 ),
@@ -1324,24 +1322,48 @@ class LevListRow extends StatelessWidget {
     super.key,
     required this.title,
     this.value,
+    this.valueDirection,
     this.subtitle,
     this.trailing,
     this.onTap,
+    this.onLongPress,
     this.showDivider = true,
     this.semanticsHint,
   });
 
   final String title;
   final String? value;
+
+  /// Forces the reading direction of [value].
+  ///
+  /// A version, a model name or a phone number is Latin inside a Hebrew row.
+  /// Left to the ambient direction, its leading and trailing punctuation
+  /// resolves RTL and the value renders back-to-front — `(build 1) 1.0.0`.
+  /// Pass [TextDirection.ltr] for anything that is not a translated sentence.
+  final TextDirection? valueDirection;
+
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// A secondary action on the same row — the About section's version row
+  /// copies itself with it.
+  ///
+  /// A long press is invisible, so a row that carries one **must** say so in
+  /// [semanticsHint]: a screen-reader user has no other way to learn it is
+  /// there, and the pointer has no hover state on a settings row to reveal it.
+  final VoidCallback? onLongPress;
+
   final bool showDivider;
 
   /// Announced after the title. Carries the "why" of a disabled control — see
-  /// the lock row in Settings.
+  /// the lock row in Settings — and the "what happens" of an [onLongPress].
   final String? semanticsHint;
 
+  /// The most of the row a [value] may take before it starts wrapping.
+  ///
+  /// The title keeps the rest. Both halves are readable at the split, and it
+  /// only ever binds when the two together would not have fitted anyway.
   @override
   Widget build(BuildContext context) {
     final c = levColors(context);
@@ -1352,6 +1374,7 @@ class LevListRow extends StatelessWidget {
         hint: semanticsHint,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Container(
             constraints: const BoxConstraints(minHeight: LevSpace.minTouch),
             padding: const EdgeInsetsDirectional.symmetric(
@@ -1365,39 +1388,79 @@ class LevListRow extends StatelessWidget {
                 ),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(title, style: text.bodyLarge)),
-                    if (value != null) Text(value!, style: text.bodyMedium),
-                    if (trailing != null) ...[
-                      const SizedBox(width: LevSpace.sm),
-                      trailing!,
-                    ] else if (onTap != null) ...[
-                      const SizedBox(width: LevSpace.xs),
-                      // Mirrors itself under RTL without a branch here.
-                      Icon(Icons.chevron_left, size: 18, color: c.muted),
-                    ],
-                  ],
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: LevSpace.xs),
-                  Text(
-                    subtitle!,
-                    style: text.labelLarge?.copyWith(
-                      letterSpacing: 0,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+            child: _content(text, c),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _content(TextTheme text, LevColors c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            // Title and value share one inner row, and both are `Flexible`.
+            //
+            // A non-flex child of a `Row` is laid out with an unbounded main
+            // axis, so a plain `Text` value overflows the moment title + value
+            // exceed the row — which at 200% text scale, in a narrow window, or
+            // after a longer translation, they do. Flexing both caps each at
+            // half the row, and `spaceBetween` hands the slack that is left to
+            // the gap *between* them, so a short value still sits hard against
+            // the chevron instead of leaving a hole beside it.
+            //
+            // Deliberately **not** a `LayoutBuilder` measuring the row and
+            // capping the value against it. That reads better and breaks
+            // `AlertDialog`, which wraps its content in `IntrinsicWidth` and
+            // therefore asks its children for intrinsic dimensions —
+            // a question `LayoutBuilder` cannot answer, so every row in the
+            // language and appearance pickers threw instead of rendering.
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(child: Text(title, style: text.bodyLarge)),
+                  if (value != null)
+                    Flexible(
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          start: LevSpace.sm,
+                        ),
+                        child: Text(
+                          value!,
+                          style: text.bodyMedium,
+                          textDirection: valueDirection,
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: LevSpace.sm),
+              trailing!,
+            ] else if (onTap != null) ...[
+              const SizedBox(width: LevSpace.xs),
+              // Mirrors itself under RTL without a branch here.
+              Icon(Icons.chevron_left, size: 18, color: c.muted),
+            ],
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: LevSpace.xs),
+          Text(
+            subtitle!,
+            style: text.labelLarge?.copyWith(
+              letterSpacing: 0,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -1419,6 +1482,184 @@ class LevListGroup extends StatelessWidget {
         border: Border.all(color: c.line),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// About
+//
+// Three components the About section needed and the library did not have. They
+// live here rather than in the screen for the reason at the top of this file:
+// a screen that assembles its own coloured row is where the palette starts
+// coming apart.
+// ═══════════════════════════════════════════════════════════════════════
+
+/// The logo, small and centred, as a signature at the head of a section.
+///
+/// **It is [LevLogo.horizontal] and nothing hand-assembled.** The mark beside a
+/// `Text` spelling the name out is precisely the lockup #28 took out of the
+/// bars: it sets the wordmark in the interface face, which turns the product's
+/// name into a heading that happens to say it. The word belongs to the logo, in
+/// the logo's own font, and there is a variant that draws exactly that.
+///
+/// [LevLogo.vertical] is the other candidate and is wrong here for the opposite
+/// reason: the stacked lockup is how the product introduces itself, and it
+/// belongs to the splash and the first run. This is a signature at the bottom
+/// of a settings screen. At [height] the symbol also takes the pack's heavier
+/// `micro` drawing, which is what keeps it from reading as a smudge.
+class LevBrandLine extends StatelessWidget {
+  const LevBrandLine({super.key});
+
+  /// Small enough to take the micro geometry, large enough to read as the mark.
+  static const double height = 20;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [LevLogo.horizontal(height: height)],
+    );
+  }
+}
+
+/// A few plain statements, one under the other, on a card.
+///
+/// No bullets and no icons: these are sentences the reader is meant to read,
+/// and a bullet in front of each turns them into a feature list — which is the
+/// one thing this text must not read as.
+class LevFactList extends StatelessWidget {
+  const LevFactList(this.lines, {super.key});
+
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return LevCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final line in lines) ...[
+            if (line != lines.first) const SizedBox(height: LevSpace.md),
+            Text(line, style: text.bodyLarge),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A phone number that can be selected, on a row that can dial it.
+///
+/// The number is a [SelectableText] and not a label, which is why this is not
+/// simply a [LevListRow]: on a desktop with no dialler the only thing left to
+/// do with a number is copy it, and a number that cannot be selected is a
+/// number that has to be transcribed by hand from the screen.
+///
+/// That is also why the row itself is not an [InkWell]. A tap target wrapping
+/// selectable text swallows the drag that selects it, so the dial action sits
+/// on its own control at the end of the row and the text is left alone.
+///
+/// `tel:`, never a web address — this is an app with no network, and a link
+/// would be a dead button. Like [LevSupportCard], this widget does not know
+/// `url_launcher` exists: it takes [onCall] and the screen decides.
+class LevContactRow extends StatelessWidget {
+  const LevContactRow({
+    super.key,
+    required this.title,
+    required this.phone,
+    required this.callLabel,
+    this.subtitle,
+    this.onCall,
+    this.showDivider = true,
+  });
+
+  final String title;
+  final String phone;
+
+  /// What the dial control announces. Shown to a screen reader, not drawn.
+  final String callLabel;
+
+  final String? subtitle;
+
+  /// Null on a platform with no dialler: the number still shows, and there is
+  /// simply no control beside it.
+  final ValueChanged<String>? onCall;
+
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = levColors(context);
+    final text = Theme.of(context).textTheme;
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: LevSpace.minTouch),
+      padding: const EdgeInsetsDirectional.only(start: LevSpace.lg),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: showDivider ? c.line : Colors.transparent),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                vertical: LevSpace.md,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: text.bodyLarge),
+                  if (subtitle != null) Text(subtitle!, style: text.bodyMedium),
+                  const SizedBox(height: LevSpace.xs),
+                  // Latin digits inside a Hebrew line: the local Directionality
+                  // keeps the number from flipping the row it sits in.
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: SelectableText(
+                      phone,
+                      style: text.bodyLarge?.copyWith(color: c.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (onCall != null)
+            Semantics(
+              button: true,
+              label: '$callLabel $phone',
+              child: InkWell(
+                onTap: () => onCall!(phone),
+                customBorder: const CircleBorder(),
+                child: const SizedBox(
+                  width: LevSpace.minTouch,
+                  height: LevSpace.minTouch,
+                  child: _CallGlyph(),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CallGlyph extends StatelessWidget {
+  const _CallGlyph();
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      Icons.call_outlined,
+      size: 18,
+      color: levColors(context).primary,
     );
   }
 }

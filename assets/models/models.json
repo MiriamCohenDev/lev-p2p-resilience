@@ -12,7 +12,15 @@
     "match. At runtime the same digest is re-checked before load (§7.5).",
     "",
     "sourceUrl is used ONLY by that tool, never by the app: §8 makes a network",
-    "call at runtime a defect, and nothing under lib/ reads this field."
+    "call at runtime a defect, and nothing under lib/ reads this field.",
+    "",
+    "attribution and licenseAsset carry what the model's own licence obliges us",
+    "to show. They are here rather than in Dart for the same reason everything",
+    "else about a model is: a second model arrives with a different licence, and",
+    "that must not be a code change. attribution is displayed verbatim in the",
+    "About section and is NOT translated — a licence notice is not interface",
+    "copy. licenseAsset is registered with LicenseRegistry so it reaches the",
+    "licence page, which otherwise sees pub packages only."
   ],
   "models": [
     {
@@ -20,6 +28,8 @@
       "family": "qwen",
       "assetPath": "assets/models/qwen-en-q4.gguf",
       "sourceUrl": "https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
+      "attribution": "Qwen2.5-0.5B-Instruct · © Alibaba Cloud · Apache License 2.0",
+      "licenseAsset": "assets/licenses/qwen-en-q4-license.txt",
       "sha256": "6eb923e7d26e9cea28811e1a8e852009b21242fb157b26149d3b188f3a8c8653",
       "sizeBytes": 397808192,
       "language": "en",

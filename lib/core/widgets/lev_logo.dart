@@ -10,8 +10,8 @@ import '../theme/app_theme.dart';
 /// | variant      | what it is        | where it belongs                        |
 /// |--------------|-------------------|-----------------------------------------|
 /// | [mark]       | the symbol alone  | bars, the side rail, an icon            |
-/// | [horizontal] | symbol + wordmark | documents, anywhere outside the app     |
-/// | [vertical]   | one above the other | the first-run screen, the splash, About |
+/// | [horizontal] | symbol + wordmark | documents and anywhere outside the app — and, small and centred, the About signature |
+/// | [vertical]   | one above the other | the first-run screen and the splash    |
 ///
 /// **In the application's bars the wordmark does not appear** — only the mark.
 /// The word is for the places the product introduces itself; a bar is not one of

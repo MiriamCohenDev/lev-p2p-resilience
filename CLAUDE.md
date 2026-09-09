@@ -77,7 +77,9 @@ that folder.** They are the source of truth, not this file and not the mockup PD
    `Icon`.
    - `LevLogo.mark` in the bars and the side rail — **without the word LEV**.
    - `LevLogo.vertical` on the first-run screen and the splash.
-   - `LevLogo.horizontal` only outside the application.
+   - `LevLogo.horizontal` outside the application — and, at `height: 20`, as the
+     signature at the head of the Settings "About" section (`LevBrandLine`).
+     That is the **only** place inside the app where the word appears.
    - The `OutfitSemiBold` font is for the logo's wordmark **and nothing else**;
      everything else is IBM Plex Sans Hebrew.
 5. **RTL:** `EdgeInsetsDirectional`, never `EdgeInsets` with `left`/`right`.

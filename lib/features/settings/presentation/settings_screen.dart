@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/app_info.dart';
 import '../../../core/di/db_providers.dart';
 import '../../../core/di/llm_providers.dart';
 import '../../../core/di/settings_providers.dart';
@@ -11,6 +10,8 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/lev_widgets.dart';
 import '../domain/settings.dart';
+import 'about_section.dart';
+import 'model_labels.dart';
 
 /// Three groups, and nothing else.
 ///
@@ -81,16 +82,11 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  LevSectionLabel(l10n.settingsGroupAbout),
-                  LevListGroup(
-                    children: [
-                      LevListRow(
-                        title: l10n.settingsVersion,
-                        value: AppInfo.version,
-                        showDivider: false,
-                      ),
-                    ],
-                  ),
+                  // Last, and deliberately so: the licence notices and the
+                  // product's central promise have to live somewhere permanent,
+                  // and this is the bottom of the one screen that is already
+                  // the single way to reach them.
+                  const AboutSection(),
                   const SizedBox(height: LevSpace.xl),
                 ],
               ),
@@ -229,8 +225,8 @@ class _ModelGroup extends ConsumerWidget {
         LevListRow(
           title: l10n.settingsActiveModel,
           value: l10n.settingsModelValue(
-            _familyLabel(model.family),
-            _languageLabel(l10n, model.language),
+            modelFamilyLabel(model.family),
+            modelLanguageLabel(l10n, model.language),
           ),
           subtitle: size == null
               ? l10n.settingsModelOnDevice
@@ -240,19 +236,6 @@ class _ModelGroup extends ConsumerWidget {
       ],
     );
   }
-
-  /// `qwen` → `Qwen`. The manifest's own vocabulary, capitalised for display —
-  /// deliberately not a translated table, or adding a model family would become
-  /// a code change (§5.3).
-  static String _familyLabel(String family) =>
-      family.isEmpty ? family : family[0].toUpperCase() + family.substring(1);
-
-  static String _languageLabel(AppLocalizations l10n, String code) =>
-      switch (code) {
-        'he' => l10n.languageHebrew,
-        'en' => l10n.languageEnglish,
-        _ => code,
-      };
 }
 
 typedef _Option<T> = ({T value, String label});
