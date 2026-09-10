@@ -173,9 +173,13 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     // The engine first, in both states. It used to come second, so that a
     // conversation — which is created out of storage, not out of a model —
     // could be opened while the weights loaded. Nothing is created here any
-    // more, and the one thing the draft does need is the model, so loading it
-    // the moment the tab is entered is what keeps the first reply as close as
-    // it can be to the one before it (#34).
+    // more, and the one thing the draft does need is the model (#34).
+    //
+    // This is no longer what *starts* the load: `_ModelWarmUp` does that at the
+    // first frame, so on an ordinary launch the wait below is already over by
+    // the time anyone arrives here (#35). It stays because it is still where the
+    // wait and the failure belong — someone can reach the chat within the first
+    // seconds of a cold start, and the retry re-runs the load from here.
     final engine = ref.watch(llmServiceProvider);
     if (engine.isLoading) return const _ModelPreparing();
     if (engine.hasError) {

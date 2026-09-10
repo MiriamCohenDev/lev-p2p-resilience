@@ -1869,6 +1869,192 @@ fourth string saying the same thing.
 
 ---
 
+## #35 — The weights load when the application starts, not when the chat is opened
+
+**Status:** Accepted — amends the "the model's load begins the moment the chat is
+opened" half of #34's consequence
+
+**Decision.** `LevApp` wraps its `MaterialApp.router` in a `_ModelWarmUp` widget
+that subscribes to `llmServiceProvider` in `initState` and renders nothing of its
+own. The subscription is `ref.listenManual` with an empty callback, it sits
+**above** `_FirstRunGate`, and a load failure is not surfaced anywhere at app
+level. The chat screen's `engine.isLoading` / `engine.hasError` branches are
+untouched.
+
+**Rationale.**
+
+*On moving it at all.* `llmServiceProvider` is a kept-alive `FutureProvider`, so
+the load is paid exactly once per launch whatever triggers it — the only thing in
+question is *when*. Until now the first watcher in the entire application was
+`_ChatBody`, which meant the cost landed on the first entry to the chat and
+`_ModelPreparing` was what the first visit of every session looked like. That is
+the worst available moment: the person has just said what they want and is being
+made to wait for it. Moved to the first frame, the same seconds are spent while
+they are still looking at the splash, the welcome screen or Home, and the chat
+opens straight into its composer.
+
+*On `listenManual` rather than `ref.watch`.* A watch in `LevApp.build` would
+rebuild the whole `MaterialApp.router` — router config, theme, locale — on each
+`AsyncValue` transition, to render a value the widget never uses. The manual
+subscription instantiates the provider and holds it alive with no rebuild at all.
+
+*On sitting above the first-run gate.* Whether onboarding has been seen is an
+answer out of the encrypted database, and making the cheapest win in this change
+wait on a database read would give most of it back. Above the gate it also covers
+a genuine first install, where the ~397 MB GGUF is extracted from the asset bundle
+while the welcome screen is up — which is exactly the moment to do it, since
+nothing else is competing and the alternative is doing it under the chat.
+
+*On swallowing the failure.* A model that will not load means the *chat* cannot
+answer. Mutual aid is unaffected, and design rule 9 has every chat error screen
+end by saying so — a model error raised over Home would say the opposite of the
+sentence the product is committed to. `_ModelFailure` already switches on
+`ModelIntegrityFailed` and `NoSuitableModel` and offers
+`ref.invalidate(llmServiceProvider)`; that retry still works, and now re-runs
+immediately rather than on the next watch, because this subscription keeps the
+provider alive.
+
+**The tension, stated plainly.** Technical-spec §8 says "the model is loaded
+lazily and unloaded when idle". This makes the load **eager**, so a launch that
+only ever opens mutual aid now pays the model's resident memory — roughly 400 MB
+for the 0.5B Q4_K_M — and, on a first install, the extraction as well. Accepted
+deliberately: the product's first capability is the chat, and §8's *other* half
+is the real remedy. `LlmService.unload` exists and nothing calls it; an
+idle-unload policy is now the open question, and it is a better one than "when
+does the load start", because it bounds the cost without charging the wait to the
+person who came to talk. **Open, alongside #19's release-build latency
+measurement.**
+
+**Rejected alternatives.**
+
+- *`ref.watch(llmServiceProvider)` in `LevApp.build`* — one line, no new widget.
+  Rejected on the rebuild above: it is a `MaterialApp` rebuild per transition for
+  a value that is never read.
+- *Reading the provider in `main()` before `runApp`* — the most literal reading of
+  "when the application starts". Rejected three times over: there is no
+  `ProviderScope` yet to read from, `rootBundle` and `path_provider` need
+  `WidgetsFlutterBinding.ensureInitialized()` which `runApp` otherwise does, and
+  no host test runs `main()` — so the warm-up would be untestable rather than
+  merely untested.
+- *Starting the load only once `_FirstRunGate` resolves* — avoids competing with
+  the welcome screen on a first install. Rejected on the reasoning above; the
+  extraction has to happen on some launch, and the one where nothing else is
+  asking for the model is the cheapest one.
+- *Warming the whole chain — `modelRegistryProvider`, `modelFileStoreProvider` —
+  rather than just the service* — looks more thorough. Rejected as actively
+  wrong: those two are un-overridden in `ChatHarness`, so `path_provider` would
+  throw `MissingPluginException` in every host test, and `rootBundle`'s cached
+  asset future would hang every test after the first in a file — the trap
+  `chat_harness.dart` documents and substitutes around. Warming the one provider
+  the harness *does* override keeps the suite honest.
+- *Pre-warming a session as well, so the first reply's prefill is paid up front
+  too* — the larger of the two waits. Rejected; #34's reasoning is unchanged and
+  is not reopened here.
+
+**Consequence.** `_ModelPreparing` still exists and is still reachable — a cold
+start followed immediately by a tap on Chat can outrun the load, and the retry
+path returns to it — but on an ordinary launch it is no longer seen. Its copy
+("This happens once. After it, opening is immediate.") remains true.
+
+`test/app_smoke_test.dart` asserts the model is loaded after `pumpApp` while Home
+is showing and the chat has never been opened, reading `FakeLlmService.loadedModel`
+through the harness. It fails without the warm-up, which is the point of it.
+
+---
+
+## #36 — The integrity check is hashed once per file, off the main isolate
+
+**Status:** Accepted — makes #35 survivable on Android; amends §7.5's "at load
+time" to "at install time, re-earned whenever the file changes"
+
+**Decision.** Two changes to `InstalledModelFileStore._verify`:
+
+1. **The hash runs on its own isolate** (`Isolate.run`), never on the caller's.
+2. **A successful hash writes a receipt** — `<model>.gguf.verified`, holding the
+   digest it was checked against, the file's size and its modification time in
+   microseconds. A later launch that finds all three still true skips the hash.
+   Any mismatch, any unreadable receipt, and the hash runs again; a **failed**
+   check deletes the receipt before throwing.
+
+**Rationale — measured, not assumed.** #35 moved the model load to startup, which
+is right on Windows (5–8 s, over before anyone reaches the chat) and was close to
+unusable on Android. Cold start on an API-34 x86_64 emulator with 2.4 GB of RAM:
+
+| t | RSS | what is happening |
+|---|---|---|
+| 0 → 20 s | 66 → 413 MB | the sha256 streaming the 397 MB GGUF |
+| 20 → 29 s | ~413 MB | the hash finishing |
+| 30 → 32 s | → 892 MB | llama.cpp loading the weights |
+
+**~20 of the 32 seconds was the integrity check, and it was paid on every
+launch.** Worse than slow: it ran on the main isolate, so `Skipped 181 frames`
+through the whole of startup and, on that emulator, an ANR — *"Process system
+isn't responding"* — that wedged the system UI. Before #35 the same work happened
+on entering the chat, where it was merely a long wait; at startup it collides
+with the frames Android's watchdog is measuring.
+
+*On the isolate.* `sha256.bind` yields between blocks, which is why this was
+tolerable when it sat behind a loading screen. It is still hundreds of megabytes
+of work on whichever isolate calls it, and startup is the one place that cannot
+absorb it.
+
+*On the receipt.* Hashing 397 MB to learn what we learned last launch about a
+file nothing has touched is the definition of work worth caching. Size **and**
+mtime are what tie the receipt to *these bytes* rather than to the path — replace
+the GGUF, which is precisely the sideload case #19 built this store for, and both
+move. Storing the expected digest too means moving the pin in the manifest
+re-verifies rather than silently inheriting a check made against the old one.
+
+**The security trade, stated plainly.** §7.5 asks for the file to be checked
+before load; after this it is checked before the *first* load and thereafter only
+when size or mtime move. **An attacker who rewrites the weights in place,
+preserving both, is no longer detected.** That is a real reduction and it was
+taken deliberately, on two grounds. §7.1's threat model for v1 is local physical
+access — and anyone able to rewrite a file inside the app's private directory can
+rewrite the receipt beside it just as easily, so the check was never a barrier to
+*that* attacker. What §7.5 names is corruption and tampering, and corruption
+moves size or mtime. What is genuinely given up is the narrow case of a
+same-size, mtime-preserving rewrite by something that could not also touch the
+receipt. Weighed against 20 seconds on every launch and an ANR, that was judged
+the right way round — **by the product owner, not by this file.**
+
+**Rejected alternatives.**
+
+- *Keep hashing every launch, and only move it to an isolate* — no security
+  change at all, and it does fix the ANR. Rejected as the answer to the question
+  actually asked: the chat would still show "preparing the model" to anyone who
+  opens it in the first half-minute on Android, which is what #35 set out to
+  remove.
+- *Hash a sample — the first and last few megabytes plus the size* — faster, no
+  receipt, still catches truncation. Rejected as the worst of both: it is not the
+  digest §7.5 asks for and it is not honest to keep calling it one, while the
+  attacker it stops is the same one the receipt stops.
+- *Keep the receipt in the encrypted database instead of beside the file* — the
+  one place #12/#13 have already made tamper-evident, and it would close the
+  rewrite hole above. Rejected for now on layering: `lib/llm/` is shared
+  infrastructure with no repository dependency, and giving the file store one to
+  save a hash inverts the direction #6 fixes. **Worth reopening** if the threat
+  model changes — it is the right home for this record, not a wrong one.
+- *Verify in the background while llama.cpp loads in parallel* — no wait at all.
+  Rejected outright: it hands unverified weights to the native library and finds
+  out afterwards, which is not a check, it is a notification.
+
+**Consequence.** A second file now lives beside every installed GGUF, and
+deleting the GGUF should take its receipt too — nothing does that yet, because
+nothing deletes a GGUF. `test/llm/model_file_store_test.dart` pins all four
+behaviours, and one of them asserts the weakening directly: same size, same
+mtime, different bytes, and the store returns the path. That test is there so the
+trade is visible to whoever reads it next, rather than being an absence someone
+has to notice.
+
+**Open — the number is from an emulator.** An x86_64 emulator with 2.4 GB of RAM
+and virtualised I/O is the worst case, not the target. #19 already owes Phase 5 a
+release-build measurement on a physical arm64 device; this adds a second reason
+to take it, since it decides whether the remaining ~12 s of llama.cpp load is
+itself short enough for #35's promise to hold on a real phone.
+
+---
+
 ## Terminology clarified during design
 
 - **"Login"** means authenticating against a server. It is not applicable to LEV — there is no server. What *is* applicable is **local lock** (the optional PIN, #5).

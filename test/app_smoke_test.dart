@@ -67,4 +67,27 @@ void main() {
     );
     expect(find.text('LEV'), findsNothing);
   });
+
+  chatWidgetTest('the model loads at startup, before the chat is ever opened',
+      (tester, harness) async {
+    await harness.pumpApp(tester);
+
+    // Nothing here navigates: the app is sitting on Home and `_ChatBody` — which
+    // used to be the first and only watcher of `llmServiceProvider` — has never
+    // been built. The weights are loaded anyway, because `_ModelWarmUp` started
+    // them at the first frame (#35).
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(harness.engine.loadedModel, isNotNull);
+  });
+
+  chatWidgetTest('the warm-up survives the welcome screen', (tester, harness) async {
+    // The warm-up sits above the first-run gate, so a launch that has not been
+    // through onboarding loads the model too — which is the launch where the
+    // weights have to be extracted from the asset bundle, and the one where
+    // nothing else is competing for them.
+    await harness.pumpApp(tester, onboardingSeen: false);
+
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+    expect(harness.engine.loadedModel, isNotNull);
+  });
 }

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart' show ByteData, rootBundle;
@@ -96,7 +98,8 @@ class InstalledModelFileStore implements ModelFileStore {
     await part.rename(target.path);
   }
 
-  /// §7.5's integrity check.
+  /// §7.5's integrity check — hashed once per installed file, not once per
+  /// launch, and never on the main isolate (technical-decisions #36).
   ///
   /// Streamed rather than read whole: hashing by loading the file into memory
   /// would cost as much RAM as the model itself, on the one device class §8
@@ -110,9 +113,17 @@ class InstalledModelFileStore implements ModelFileStore {
   Future<void> _verify(File target, ModelDescriptor model) async {
     if (model.sha256.isEmpty) return;
 
-    final digest = await sha256.bind(target.openRead()).first;
-    final actual = digest.toString();
-    if (actual != model.sha256.toLowerCase()) {
+    final expected = model.sha256.toLowerCase();
+    final stat = await target.stat();
+    final receipt = _receiptFor(target);
+    if (await _receiptStillHolds(receipt, expected, stat)) return;
+
+    final actual = await _hashOffThread(target.path);
+    if (actual != expected) {
+      // A receipt that outlived the file it vouched for would let the next
+      // launch trust these bytes. Whatever else is true, this file is not the
+      // one the manifest describes, so nothing may vouch for it.
+      if (await receipt.exists()) await receipt.delete();
       throw ModelIntegrityFailed(
         'the weights at ${target.path} do not match the digest the manifest '
         'pins for model "${model.id}": expected ${model.sha256}, found $actual. '
@@ -120,8 +131,70 @@ class InstalledModelFileStore implements ModelFileStore {
         'reinstall rather than loading it.',
       );
     }
+    await _writeReceipt(receipt, expected, stat);
+  }
+
+  /// Where the proof that [target] was hashed once already is kept.
+  File _receiptFor(File target) => File('${target.path}.verified');
+
+  /// Whether the recorded proof still describes the file on disk.
+  ///
+  /// Size and modification time together are what make the receipt refer to
+  /// *these* bytes rather than to the path. Replace the GGUF — the sideload
+  /// case §7.5 exists for — and both move, so the hash runs again. The digest
+  /// is stored too, so changing the pin in the manifest re-verifies rather
+  /// than silently accepting a file that was checked against the old one.
+  ///
+  /// Any failure to read it answers "no". Re-hashing costs seconds; trusting a
+  /// receipt we could not parse costs the check itself.
+  Future<bool> _receiptStillHolds(
+    File receipt,
+    String expected,
+    FileStat stat,
+  ) async {
+    if (!await receipt.exists()) return false;
+    try {
+      final record = jsonDecode(await receipt.readAsString());
+      if (record is! Map<String, dynamic>) return false;
+      return record['sha256'] == expected &&
+          record['sizeBytes'] == stat.size &&
+          record['modifiedAtMicros'] == stat.modified.microsecondsSinceEpoch;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _writeReceipt(
+    File receipt,
+    String expected,
+    FileStat stat,
+  ) async {
+    // A half-written receipt does not parse, and an unparseable receipt is
+    // simply re-earned by hashing — so there is nothing here to make atomic.
+    await receipt.writeAsString(
+      jsonEncode({
+        'sha256': expected,
+        'sizeBytes': stat.size,
+        'modifiedAtMicros': stat.modified.microsecondsSinceEpoch,
+      }),
+      flush: true,
+    );
   }
 }
+
+/// Hashes [path] on an isolate of its own.
+///
+/// `sha256.bind` yields between blocks, so on paper it shares the thread
+/// politely — but it is still several hundred megabytes of work on whichever
+/// isolate calls it, and since #35 that call happens while the application is
+/// starting. On Android that was measurable and then some: dropped frames
+/// through the whole of startup, and on a 2 GB emulator an ANR that took the
+/// system UI down with it. Off the main isolate, the cost is real but nothing
+/// waits on it except the model.
+Future<String> _hashOffThread(String path) => Isolate.run(() async {
+      final digest = await sha256.bind(File(path).openRead()).first;
+      return digest.toString();
+    });
 
 /// Fails unless every model in [models] pins a digest.
 ///
