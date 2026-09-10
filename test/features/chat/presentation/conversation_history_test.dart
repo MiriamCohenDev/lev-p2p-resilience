@@ -80,13 +80,35 @@ void main() {
     await harness.repository.createConversation(title: 'about Shabbat');
     await pumpList(tester, harness);
 
+    // A prefix that matches first, so the field is typed into while results are
+    // showing and then lands on none — the transition that used to rebuild it.
+    await tester.enterText(find.byType(TextField), 'about');
+    await tester.pumpAndSettle();
+    expect(find.text('about Shabbat'), findsOneWidget);
+
     await tester.enterText(find.byType(TextField), 'zzzz');
     await tester.pumpAndSettle();
 
     expect(find.text(l10n.conversationsSearchEmptyTitle), findsOneWidget);
-    // A filtered empty state gets no action: there is nothing to do in it but
-    // change the search, so a button there would be noise.
-    expect(find.text(l10n.conversationsNew), findsNothing);
+    expect(find.text(l10n.conversationsEmptyTitle), findsNothing);
+
+    // The search is still the one the person is typing into: the same field,
+    // still holding what was typed, still focused, still carrying its hint.
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('zzzz'), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.decoration!.hintText, l10n.conversationsSearchHint);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus,
+      isTrue,
+    );
+    // The header does not reshuffle under the typing either.
+    expect(find.text(l10n.conversationsNew), findsOneWidget);
+
+    // And clearing it brings the list back.
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pumpAndSettle();
+    expect(find.text('about Shabbat'), findsOneWidget);
   });
 
   chatWidgetTest('creating a conversation stamps the active model',

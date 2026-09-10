@@ -363,6 +363,7 @@ class LevConversationList extends StatelessWidget {
     required this.onSelect,
     required this.onNewChat,
     this.onSearch,
+    this.searching = false,
     this.onRename,
     this.onDelete,
     this.onOpenSettings,
@@ -376,6 +377,15 @@ class LevConversationList extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onNewChat;
   final ValueChanged<String>? onSearch;
+
+  /// Whether [groups] is the result of a search. It decides only which empty
+  /// state an empty list shows: "nothing matched" rather than "nothing yet".
+  ///
+  /// The list owns both empty states, rather than its caller swapping it out
+  /// for a no-results screen, so the search field is never rebuilt: what was
+  /// typed, the focus, and the field's hint all stay exactly where they were
+  /// while the results below them change.
+  final bool searching;
 
   /// What a row's own menu offers. Both are optional; a list given neither has
   /// no menu at all, and its rows lose the control that opens one.
@@ -432,8 +442,12 @@ class LevConversationList extends StatelessWidget {
         Expanded(
           child: groups.isEmpty
               ? LevEmptyState(
-                  title: l10n.conversationsEmptyTitle,
-                  body: l10n.conversationsEmptyBody,
+                  title: searching
+                      ? l10n.conversationsSearchEmptyTitle
+                      : l10n.conversationsEmptyTitle,
+                  body: searching
+                      ? l10n.conversationsSearchEmptyBody
+                      : l10n.conversationsEmptyBody,
                 )
               : ListView(
                   children: [
