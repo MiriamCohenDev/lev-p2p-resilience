@@ -56,29 +56,16 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
         final matches = _filter(items, l10n);
         final groups = _group(context, matches);
 
-        // A filtered empty state explains and offers nothing to press; a
-        // genuinely empty one invites. `LevConversationList` renders the second
-        // when its groups are empty, so only the first is handled here.
-        if (groups.isEmpty && _query.isNotEmpty) {
-          return Column(
-            children: [
-              _searchField(l10n),
-              Expanded(
-                child: LevEmptyState(
-                  title: l10n.conversationsSearchEmptyTitle,
-                  body: l10n.conversationsSearchEmptyBody,
-                ),
-              ),
-            ],
-          );
-        }
-
         return LevConversationList(
           groups: groups,
           selectedId: widget.selectedId,
           onSelect: (id) => context.go(AppRoutes.conversation(id)),
           onNewChat: _startConversation,
           onSearch: (value) => setState(() => _query = value),
+          // Always this one widget, with or without results: swapping it for a
+          // separate no-results screen rebuilt the search field under the
+          // person typing into it.
+          searching: _query.trim().isNotEmpty,
           // The row hands back an id; the dialog needs the conversation, because
           // it prefills with the *stored* title and the row may be showing the
           // "untitled" placeholder instead of one.
@@ -91,20 +78,6 @@ class _ConversationHistoryState extends ConsumerState<ConversationHistory> {
       },
     );
   }
-
-  /// The search field, duplicated only for the no-results state — which has to
-  /// keep it on screen, since changing the search is the one thing to do there.
-  Widget _searchField(AppLocalizations l10n) => Padding(
-        padding: const EdgeInsetsDirectional.all(LevSpace.lg),
-        child: TextField(
-          onChanged: (value) => setState(() => _query = value),
-          decoration: InputDecoration(
-            hintText: l10n.conversationsSearchHint,
-            prefixIcon: const Icon(Icons.search, size: 18),
-            isDense: true,
-          ),
-        ),
-      );
 
   List<Conversation> _filter(
     List<Conversation> items,
