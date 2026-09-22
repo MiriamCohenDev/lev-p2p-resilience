@@ -96,6 +96,74 @@ void main() {
     );
   });
 
+  test('records a receipt, and a later launch trusts it instead of hashing',
+      () async {
+    // The point of technical-decisions #36: on Android the hash was ~20 of the
+    // 32 seconds between launch and a usable chat, paid again on every launch.
+    final model = _descriptor(sha256: _weightsDigest);
+    final path = await storeWith().pathFor(model);
+    expect(File('$path.verified').existsSync(), isTrue);
+
+    // Same size, same modification time, different bytes. The receipt is
+    // believed and the hash does not run — which is exactly the check #36
+    // trades away, asserted here rather than left as a footnote.
+    final target = File(path);
+    final stamp = target.lastModifiedSync();
+    target.writeAsBytesSync(
+      Uint8List.fromList(utf8.encode('GGUF pretend WEIGHTS')),
+    );
+    target.setLastModifiedSync(stamp);
+
+    await expectLater(storeWith().pathFor(model), completion(path));
+  });
+
+  test('re-verifies once the file on disk has actually changed', () async {
+    final model = _descriptor(sha256: _weightsDigest);
+    final path = await storeWith().pathFor(model);
+
+    // A real replacement moves size and modification time, so the receipt
+    // stops describing the file and §7.5 runs again.
+    File(path).writeAsBytesSync(utf8.encode('a different model entirely'));
+
+    await expectLater(
+      storeWith().pathFor(model),
+      throwsA(isA<ModelIntegrityFailed>()),
+    );
+    // And nothing is left behind to vouch for it on the next launch.
+    expect(File('$path.verified').existsSync(), isFalse);
+  });
+
+  test('re-verifies when the manifest pins a different digest', () async {
+    final path = await storeWith().pathFor(_descriptor(sha256: _weightsDigest));
+    expect(File('$path.verified').existsSync(), isTrue);
+
+    // The receipt records which digest it was earned against, so moving the
+    // pin cannot be satisfied by a check made against the old one.
+    await expectLater(
+      storeWith().pathFor(
+        _descriptor(sha256: sha256.convert(utf8.encode('other')).toString()),
+      ),
+      throwsA(isA<ModelIntegrityFailed>()),
+    );
+  });
+
+  test('an unreadable receipt is re-earned rather than trusted', () async {
+    final model = _descriptor(sha256: _weightsDigest);
+    final path = await storeWith().pathFor(model);
+
+    File('$path.verified').writeAsStringSync('not json');
+    await expectLater(storeWith().pathFor(model), completion(path));
+
+    // The fallback is the check itself, not a shrug: a bad file with a
+    // garbage receipt is still refused.
+    File('$path.verified').writeAsStringSync('not json');
+    File(path).writeAsBytesSync(utf8.encode('a different model entirely'));
+    await expectLater(
+      storeWith().pathFor(model),
+      throwsA(isA<ModelIntegrityFailed>()),
+    );
+  });
+
   test('reports missing weights as unavailable, not as corrupt', () async {
     // The two are opposite states and the caller treats them differently: one is
     // an installation step that has not happened, the other is a file that must

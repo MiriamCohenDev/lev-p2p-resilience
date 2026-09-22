@@ -11,7 +11,6 @@ import '../../../core/routing/destination_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/lev_widgets.dart';
 import '../../chat/domain/conversation.dart';
-import '../../chat/presentation/start_conversation.dart';
 
 /// The landing screen: a greeting for the hour, one primary action, and one
 /// quiet reminder of where the last conversation stopped.
@@ -78,7 +77,11 @@ class _HomeBody extends ConsumerWidget {
         const SizedBox(height: LevSpace.xl),
         LevButton(
           label: l10n.homeStartChat,
-          onPressed: () => _start(context, ref),
+          // The empty draft, not a new conversation: a conversation exists once
+          // something has been said in it (technical-decisions #34). The button
+          // still does exactly what it says — it just does not leave a row
+          // behind when the answer turns out to be "not now".
+          onPressed: () => context.go(AppRoutes.chat),
         ),
         const _ResumeSection(),
         // Home's third section in the design — "open requests · 3" — is not
@@ -87,12 +90,6 @@ class _HomeBody extends ConsumerWidget {
         // It arrives with `HelpRepository`.
       ],
     );
-  }
-
-  Future<void> _start(BuildContext context, WidgetRef ref) async {
-    final id = await startConversation(ref);
-    if (!context.mounted) return;
-    context.go(AppRoutes.conversation(id));
   }
 }
 

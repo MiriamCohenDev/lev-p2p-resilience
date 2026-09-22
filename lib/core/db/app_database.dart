@@ -171,19 +171,6 @@ class ChatDao extends DatabaseAccessor<AppDatabase> with _$ChatDaoMixin {
         .watch();
   }
 
-  /// The most recently active live conversation, or `null` if there is none.
-  ///
-  /// A snapshot rather than a watch, for the same reason [messagesOf] is one:
-  /// the caller wants the list as it stands right now, and awaiting `.first` on
-  /// [watchConversations] to get that would leave a subscription behind.
-  Future<ConversationRow?> latestConversation() {
-    return (select(conversations)
-          ..where((c) => c.isDeleted.equals(false))
-          ..orderBy([(c) => OrderingTerm.desc(c.updatedAt)])
-          ..limit(1))
-        .getSingleOrNull();
-  }
-
   Future<void> insertConversation(ConversationsCompanion conversation) {
     return into(conversations).insert(conversation);
   }

@@ -15,14 +15,15 @@ abstract final class AppRoutes {
 
   /// The chat with no conversation chosen — the bar's Chat destination.
   ///
-  /// It opens a blank conversation and moves to [conversation]: entering the
-  /// chat is the request, and a screen asking to confirm it was one step in
-  /// front of the only thing anyone comes here to do.
+  /// **A screen in its own right, and it creates nothing** (technical-decisions
+  /// #34, superseding #32). It is a composer with an empty conversation behind
+  /// it; sending the first message is what creates the conversation and moves to
+  /// [conversation], carrying that message as `extra`. Opening a tab is not
+  /// starting a conversation.
   ///
-  /// **The move is made by the screen, not by a `redirect` here.** Which
-  /// conversation to open is an answer out of the encrypted database, and a
-  /// router redirect would have to guess at it while it loads — the same reason
-  /// the first-run gate sits around the router rather than inside it.
+  /// It is also where deleting the conversation you are on lands, which is why
+  /// every route into the chat that has no id to offer comes here rather than
+  /// guessing at one.
   static const String chat = '/chat';
 
   /// The conversation id, as it appears in the path and in `state.pathParameters`.

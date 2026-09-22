@@ -20,13 +20,6 @@ abstract class ChatRepository {
   /// far as every caller above this interface is concerned.
   Stream<List<Conversation>> watchConversations();
 
-  /// The most recently active conversation, or `null` if there is none.
-  ///
-  /// Read once, not watched: entering the chat asks which conversation to open
-  /// and then acts on the answer, and a subscription taken to answer a question
-  /// asked once would outlive it.
-  Future<Conversation?> latestConversation();
-
   /// Creates and stores a conversation, returning it as stored.
   ///
   /// [systemPromptVersion] and [modelId] are recorded on the row so a later
