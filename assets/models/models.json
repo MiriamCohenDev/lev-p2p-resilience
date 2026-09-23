@@ -38,6 +38,22 @@
       "replyTokenReserve": 512,
       "stopTokens": ["<|im_end|>", "<|endoftext|>"],
       "quantization": "Q4_K_M"
-    }
+    },
+{
+  "id": "qwen-en-3b-q4",
+  "family": "qwen",
+  "assetPath": "assets/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+  "sourceUrl": "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+  "attribution": "Qwen2.5-3B-Instruct · © Alibaba Cloud · Qwen Research License",
+  "sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+  "sizeBytes": 1929903264,
+  "language": "en",
+  "minRamMb": 6144,
+  "contextTokens": 8192,
+  "replyTokenReserve": 512,
+  "stopTokens": ["<|im_end|>", "<|endoftext|>"],
+  "quantization": "Q4_K_M"
+}
+
   ]
 }
